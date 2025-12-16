@@ -42,6 +42,40 @@ If you want, I can add a README section describing other developer notes (tests,
 
 If you'd like, I can add a `requirements.txt` or a `pyproject.toml` entry for these optional dev dependencies.
 
+## macOS Build (PyInstaller)
+
+When building a macOS GUI app with PyInstaller, build on macOS and include your `data/` folder and an `.icns` icon.
+
+Recommended command:
+
+```bash
+pyinstaller --onefile --noconsole --icon=data/app.icns --add-data "data:./data" arcsoftware.py
+```
+
+Notes:
+- Use `:` as the `--add-data` separator on macOS/Linux. The `--icon` for macOS should be an `.icns` file.
+- The app should use a `resource_path()` helper (already in `arcsoftware.py`) so bundled resources are located via `sys._MEIPASS` at runtime.
+
+Convert a PNG to `.icns` on macOS:
+
+```bash
+# prepare a 1024x1024 PNG named icon.png
+mkdir MyIcon.iconset
+sips -z 16 16 icon.png --out MyIcon.iconset/icon_16x16.png
+sips -z 32 32 icon.png --out MyIcon.iconset/icon_16x16@2x.png
+sips -z 32 32 icon.png --out MyIcon.iconset/icon_32x32.png
+sips -z 64 64 icon.png --out MyIcon.iconset/icon_32x32@2x.png
+sips -z 128 128 icon.png --out MyIcon.iconset/icon_128x128.png
+sips -z 256 256 icon.png --out MyIcon.iconset/icon_128x128@2x.png
+sips -z 256 256 icon.png --out MyIcon.iconset/icon_256x256.png
+sips -z 512 512 icon.png --out MyIcon.iconset/icon_256x256@2x.png
+sips -z 512 512 icon.png --out MyIcon.iconset/icon_512x512.png
+sips -z 1024 1024 icon.png --out MyIcon.iconset/icon_512x512@2x.png
+iconutil -c icns MyIcon.iconset -o data/app.icns
+```
+
+If you prefer a non-onefile build for easier debugging of bundled resources, omit `--onefile`.
+
 ## Features ✅
 
 - Add / edit / delete parts for a quote (part number, description, qty, unit cost, list price, source)
