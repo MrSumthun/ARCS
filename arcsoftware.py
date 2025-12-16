@@ -9,6 +9,7 @@ import tkinter as tk
 import platform
 from tkinter import ttk, messagebox, filedialog
 import tkinter.font as tkfont
+import re
 
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 
@@ -114,11 +115,36 @@ def _new_quote_template(name=None):
     now = datetime.datetime.now(datetime.timezone.utc)
     return {
         "id": int(now.timestamp()),
-        "name": name or f'Quote {now.strftime("%Y-%m-%d %H:%M:%S")}',
+        # default name: company prefix + date (YYYY-MM-DD)
+        "name": name or f"ARC {now.strftime('%Y-%m-%d')}",
         "created_at": now.isoformat(),
         "items": [],
         "notes": "",
     }
+
+
+def format_quote_name(q):
+    # Return standardized name: 'ARC YYYY-MM-DD [PO:xxx]' (PO optional)
+    created_at = q.get("created_at")
+    if created_at:
+        try:
+            dt = datetime.datetime.fromisoformat(created_at)
+            date_str = dt.date().isoformat()
+        except Exception:
+            date_str = str(created_at)[:10]
+    else:
+        date_str = datetime.datetime.now(datetime.timezone.utc).date().isoformat()
+    name = f"Quote{date_str}"
+    po = q.get("po_number")
+    if po:
+        name = f"{name} [PO:{po}]"
+    return name
+
+
+def _safe_filename(name):
+    # Replace unsafe characters with underscore and trim length
+    fname = re.sub(r"[^A-Za-z0-9._-]", "_", name)
+    return fname[:120]
 
 
 def _center_window(root, width=DEFAULT_WIDTH, height=DEFAULT_HEIGHT):
@@ -481,6 +507,11 @@ def build_ui():
             q["notes"] = notes_text.get("1.0", "end").rstrip("\n")
         except Exception as e:
             logger.debug("Failed to read notes text: %s", e)
+            # normalize quote name to 'ARC YYYY-MM-DD [PO:xxx]' when saving
+            try:
+                q['name'] = format_quote_name(q)
+            except Exception:
+                logger.debug('Failed to normalize quote name for id=%s', q.get('id'))
         # replace if exists
         existing = [x for x in quotes if x.get("id") == q.get("id")]
         if existing:
@@ -508,7 +539,8 @@ def build_ui():
         def _quote_label(q):
             po = q.get("po_number")
             po_str = f" [PO:{po}]" if po else ""
-            return f"{q.get('id')} - {q.get('name')}{po_str} ({len(q.get('items', []))} items)"
+            # Hide internal id from the UI; show standardized name + PO and item count
+            return f"{q.get('name')}{po_str} ({len(q.get('items', []))} items)"
 
         dlg = tk.Toplevel(root)
         dlg.title("Load Quote")
@@ -553,11 +585,9 @@ def build_ui():
                 return
             idx = int(sel[0])
             q = quotes[idx]
-            fn = filedialog.asksaveasfilename(
-                defaultextension=".json",
-                filetypes=[("JSON files", "*.json"), ("All files", "*.*")],
-                initialfile=f"quote-{q.get('id')}.json",
-            )
+            # Suggest a safe filename based on standardized quote name
+            suggested = _safe_filename(format_quote_name(q))
+            fn = filedialog.asksaveasfilename(defaultextension='.json', filetypes=[('JSON files','*.json'), ('All files','*.*')], initialfile=f"{suggested}.json")
             if not fn:
                 return
             with open(fn, "w") as f:
@@ -582,6 +612,11 @@ def build_ui():
             existing_ids = {x.get("id") for x in quotes}
             if payload.get("id") in existing_ids:
                 payload["id"] = int(datetime.datetime.now(datetime.timezone.utc).timestamp())
+            # normalize imported quote name to project format
+            try:
+                payload["name"] = format_quote_name(payload)
+            except Exception:
+                logger.debug("Failed to normalize imported quote name for id=%s", payload.get("id"))
             quotes.append(payload)
             save_quotes(quotes)
             lb.insert("end", _quote_label(payload))
@@ -611,8 +646,8 @@ def build_ui():
         except Exception:
             # fallback: write HTML and open in browser for printing to PDF
             html = ['<html><head><meta charset="utf-8"><title>Quote</title></head><body>']
+            html.append("<h1>ARC-Works</h1>")
             html.append(f"<h2>{q.get('name')}</h2>")
-            html.append(f"<p>Created: {q.get('created_at')}</p>")
             html.append('<table border="1" cellspacing="0" cellpadding="4">')
             html.append(
                 "<tr><th>Part</th><th>Description</th><th>Qty</th><th>Unit</th><th>List</th><th>Source</th><th>Line</th></tr>"
@@ -645,11 +680,11 @@ def build_ui():
         os.close(fd)
         c = canvas.Canvas(path, pagesize=letter)
         y = 750
+        c.setFont("Helvetica-Bold", 16)
+        c.drawString(72, y, "ARC-Works")
+        y -= 25
         c.setFont("Helvetica-Bold", 14)
         c.drawString(72, y, q.get("name"))
-        y -= 20
-        c.setFont("Helvetica", 10)
-        c.drawString(72, y, f"Created: {q.get('created_at')}")
         y -= 30
         c.setFont("Helvetica", 9)
         for it in q.get("items", []):
