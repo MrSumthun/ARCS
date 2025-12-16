@@ -542,12 +542,12 @@ def build_ui():
             # Hide internal id from the UI; show standardized name + PO and item count
             return f"{q.get('name')}{po_str} ({len(q.get('items', []))} items)"
 
-        dlg = tk.Toplevel(root)
-        dlg.title("Load Quote")
-        dlg.transient(root)
-        dlg.grab_set()
+        load_quote_window = tk.Toplevel(root)
+        load_quote_window.title("Load Quote")
+        load_quote_window.transient(root)
+        load_quote_window.grab_set()
 
-        lb = tk.Listbox(dlg, width=60)
+        lb = tk.Listbox(load_quote_window, width=60)
         for q in quotes:
             lb.insert("end", _quote_label(q))
         lb.pack(fill="both", expand=True)
@@ -559,7 +559,7 @@ def build_ui():
             idx = int(sel[0])
             q = quotes[idx]
             set_current_quote(q)
-            dlg.destroy()
+            load_quote_window.destroy()
 
         def _delete():
             sel = lb.curselection()
@@ -587,7 +587,11 @@ def build_ui():
             q = quotes[idx]
             # Suggest a safe filename based on standardized quote name
             suggested = _safe_filename(format_quote_name(q))
-            fn = filedialog.asksaveasfilename(defaultextension='.json', filetypes=[('JSON files','*.json'), ('All files','*.*')], initialfile=f"{suggested}.json")
+            fn = filedialog.asksaveasfilename(
+                defaultextension='.json',
+                filetypes=[('JSON files', '*.json'), ('All files', '*.*')],
+                initialfile=f"{suggested}.json",
+            )
             if not fn:
                 return
             with open(fn, "w") as f:
@@ -622,7 +626,7 @@ def build_ui():
             lb.insert("end", _quote_label(payload))
             messagebox.showinfo("Import Quote", f"Imported quote '{payload.get('name')}'")
 
-        btn_frame = tk.Frame(dlg)
+        btn_frame = tk.Frame(load_quote_window)
         btn_frame.pack(fill="x", pady=6)
         btn_load = ttk.Button(btn_frame, text="Load", command=_load)
         btn_load.pack(side="left", padx=6)
@@ -632,7 +636,7 @@ def build_ui():
         btn_exp.pack(side="left", padx=6)
         btn_imp = ttk.Button(btn_frame, text="Import", command=_import)
         btn_imp.pack(side="left", padx=6)
-        btn_close = ttk.Button(btn_frame, text="Close", command=dlg.destroy)
+        btn_close = ttk.Button(btn_frame, text="Close", command=load_quote_window.destroy)
         btn_close.pack(side="right", padx=6)
 
     def export_pdf():
@@ -649,9 +653,18 @@ def build_ui():
             html.append("<h1>ARC-Works</h1>")
             html.append(f"<h2>{q.get('name')}</h2>")
             html.append('<table border="1" cellspacing="0" cellpadding="4">')
-            html.append(
-                "<tr><th>Part</th><th>Description</th><th>Qty</th><th>Unit</th><th>List</th><th>Source</th><th>Line</th></tr>"
+            header = (
+                "<tr>"
+                "<th>Part</th>"
+                "<th>Description</th>"
+                "<th>Qty</th>"
+                "<th>Unit</th>"
+                "<th>List</th>"
+                "<th>Source</th>"
+                "<th>Line</th>"
+                "</tr>"
             )
+            html.append(header)
             for it in q.get("items", []):
                 row = (
                     "<tr>"
