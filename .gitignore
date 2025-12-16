@@ -47,3 +47,14 @@ Thumbs.db
 
 # Application data (do not commit user files)
 data/quotes.json
+
+# PyInstaller / build artifacts
+dist/
+build/
+*.spec
+*.app
+*.dmg
+
+# Editor swap / backup (additional)
+*~
+.DS_Store
