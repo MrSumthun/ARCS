@@ -11,7 +11,7 @@ import tkinter.font as tkfont
 DATA_DIR = os.path.join(os.path.dirname(__file__), 'data')
 QUOTES_FILE = os.path.join(DATA_DIR, 'quotes.json')
 APP_ICON = os.path.join(DATA_DIR, 'app.ico')
-VERSION = '0.1.1'
+VERSION = '1.0.1'
 APP_TITLE = 'ARC-Works Quote Manager'
 
 # Default window size (can be customized)
