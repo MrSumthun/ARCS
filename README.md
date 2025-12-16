@@ -73,4 +73,6 @@ If you'd like, I can add a `requirements.txt` or a `pyproject.toml` entry for th
 
 - Feel free to open issues or PRs if you want features or bug fixes. Keep changes small and focused.
 - If you add tests, use `pytest` and consider adding a simple GitHub Actions workflow for CI (optional).
+ 
+**Note:** Please do **not** commit local data files (for example `data/quotes.json`) — user data is ignored via `.gitignore`.
 
