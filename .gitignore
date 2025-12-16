@@ -10,6 +10,7 @@ dist/
 *.egg-info/
 .eggs/
 pip-wheel-metadata/
+*.flake8
 
 # Virtual environments
 .venv/
