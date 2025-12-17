@@ -26,7 +26,11 @@ NAME="${2:-ARCS}"
 ICON="data/app.icns"
 ADDDATA="data:./data"
 
-echo "Building ${NAME} (using spec at data/ARCS.spec) ..."
-(cd .. && pyinstaller "data/ARCS.spec") || { echo "Build failed"; exit 1; }
+# Resolve script and repo directories relative to this script so the script can be run from anywhere
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+echo "Building ${NAME} (using spec at $REPO_ROOT/data/ARCS.spec) ..."
+(cd "$REPO_ROOT" && pyinstaller "data/ARCS.spec") || { echo "Build failed"; exit 1; }
 
 echo "Build finished. See the 'dist' directory for the ${NAME} bundle."

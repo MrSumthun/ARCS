@@ -36,6 +36,9 @@ Use the included helper scripts to build distributables:
 - Windows: run `./buildtools/windowsBuild.bat` (on Windows; script runs `pyinstaller data\ARCS.spec` from the repo root)
 
 If you prefer to run PyInstaller manually, consult the PyInstaller docs — the helper scripts show a recommended configuration.
+
+> ⚠️ Note: PyInstaller prints a deprecation warning when using onefile mode to build macOS `.app` bundles. On macOS, prefer `onedir`/directory builds for `.app` bundles (the spec can be updated to use onedir mode) to avoid future errors.
+
 Developer notes 🔧
 
 - Main module: `arcs.py` (replaced `arcsoftware.py`). Build scripts and spec updated.
