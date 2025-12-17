@@ -30,21 +30,27 @@ FG = "#e8e8e8"  # primary foreground (text)
 SELECT_BG = "#2b6fb6"  # selection color for rows
 
 # Helper to get resource path, works for dev and PyInstaller bundles
+
+
 def resource_path(rel_path):
     if getattr(sys, "frozen", False):
         return os.path.join(sys._MEIPASS, rel_path)
     return os.path.join(os.path.dirname(__file__), rel_path)
+
 
 # Bundled resources
 BUNDLED_QUOTES_FILE = resource_path(os.path.join("data", "quotes.json"))
 APP_ICON = resource_path(os.path.join("data", "app.ico"))
 
 # User data directory (for writable files)
+
+
 def user_data_dir():
     home = os.path.expanduser("~")
     d = os.path.join(home, ".arcsoftware")
     os.makedirs(d, exist_ok=True)
     return d
+
 
 # Default user-writable quotes file (outside the bundled app)
 QUOTES_FILE = os.path.join(user_data_dir(), "quotes.json")
@@ -755,7 +761,7 @@ def build_ui():
     # Small version label on the right
     ver_lbl = ttk.Label(toolbar, text=VERSION)
     ver_lbl.pack(side="right", padx=6)
-    # Small platform label next to the version 
+    # Small platform label next to the version
     try:
         platform_name_font_size = 10
         plat_name = "macOS" if platform.system() == "Darwin" else platform.system()
@@ -798,7 +804,6 @@ def build_ui():
     lbl_po.pack(side="left", padx=(12, 2))
     po_entry = ttk.Entry(toolbar, textvariable=po_entry_var, width=18)
     po_entry.pack(side="left", padx=(2, 12))
-    
     # Update current quote when PO entry loses focus or on Enter
     po_entry.bind("<Return>", lambda e: _set_po_from_entry())
     po_entry.bind("<FocusOut>", lambda e: _set_po_from_entry())
