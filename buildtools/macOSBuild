@@ -26,7 +26,7 @@ NAME="${2:-ARCS}"
 ICON="data/app.icns"
 ADDDATA="data:./data"
 
-echo "Building ${NAME} (onefile, noconsole) ..."
-pyinstaller --onefile --noconsole --name "${NAME}" --icon="${ICON}" --add-data "${ADDDATA}" arcs.py
+echo "Building ${NAME} (using spec at data/ARCS.spec) ..."
+(cd .. && pyinstaller "data/ARCS.spec") || { echo "Build failed"; exit 1; }
 
 echo "Build finished. See the 'dist' directory for the ${NAME} bundle."

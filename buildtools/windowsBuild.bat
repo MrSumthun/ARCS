@@ -9,12 +9,15 @@ if errorlevel 1 (
 
 set NAME=ARCS
 
-echo Building %NAME% ...
-pyinstaller --onefile --noconsole --name %NAME% --icon=data/app.ico --add-data "data;data" arcs.py
+echo Building %NAME% (using spec at data\ARCS.spec) ...
+pushd ..
+pyinstaller data\ARCS.spec
 if errorlevel 1 (
   echo Build failed
+  popd
   exit /b 1
 )
+popd
 echo Build succeeded. See dist\%NAME%.exe
 
 goto :eof
