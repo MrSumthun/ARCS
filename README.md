@@ -1,4 +1,4 @@
-# ARC Software
+# ARCS
 
 Simple quoting / RFQ utility built with Tkinter.
 
