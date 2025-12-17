@@ -54,6 +54,7 @@ data/quotes.json
 dist/
 build/
 *.spec
+!data/ARCS.spec
 *.app
 *.dmg
 
