@@ -11,6 +11,7 @@ from tkinter import ttk, messagebox, filedialog
 import tkinter.font as tkfont
 import re
 
+# Path to data directory (for bundled resources)
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 
 # App metadata and UI defaults
@@ -28,26 +29,22 @@ PANEL_BG = "#141414"  # panels / tree background
 FG = "#e8e8e8"  # primary foreground (text)
 SELECT_BG = "#2b6fb6"  # selection color for rows
 
-
+# Helper to get resource path, works for dev and PyInstaller bundles
 def resource_path(rel_path):
-
     if getattr(sys, "frozen", False):
         return os.path.join(sys._MEIPASS, rel_path)
     return os.path.join(os.path.dirname(__file__), rel_path)
-
 
 # Bundled resources
 BUNDLED_QUOTES_FILE = resource_path(os.path.join("data", "quotes.json"))
 APP_ICON = resource_path(os.path.join("data", "app.ico"))
 
-
+# User data directory (for writable files)
 def user_data_dir():
-
     home = os.path.expanduser("~")
     d = os.path.join(home, ".arcsoftware")
     os.makedirs(d, exist_ok=True)
     return d
-
 
 # Default user-writable quotes file (outside the bundled app)
 QUOTES_FILE = os.path.join(user_data_dir(), "quotes.json")
@@ -158,19 +155,15 @@ def _center_window(root, width=DEFAULT_WIDTH, height=DEFAULT_HEIGHT):
 
 def build_ui():
     root = tk.Tk()
-    # Window title
     root.title(APP_TITLE)
     bg_color = UI_BG
     root.configure(bg=bg_color)
-    # Ensure the window cannot be resized smaller than a usable minimum
     root.minsize(900, 600)
-
-    # Preferred sizing (larger so toolbar and PO field are visible)
     _center_window(root, DEFAULT_WIDTH, DEFAULT_HEIGHT)
     # Try to set window icon if provided
     try:
         if APP_ICON and os.path.exists(APP_ICON):
-            # On Windows, .ico with iconbitmap tends to work. On macOS/Linux, prefer iconphoto.
+            # On Windows, .ico with iconbitmap tends to work. On macOS/Linux, prefer .icns
             tried = False
             # Try iconbitmap first (works on Windows)
             try:
@@ -200,14 +193,11 @@ def build_ui():
     except Exception:
         # ignore platforms that don't support icon changes or if setting fails
         pass
-    # Note: do not override the window icon here; leave titlebar icon behavior to platform defaults
 
     # Main content area fills the window (no header)
     content = tk.Frame(root, bg=bg_color)
     content.place(relx=0, rely=0, relwidth=1, relheight=1)
-
-    # Minimal toolbar: New Quote, Add Part, Save, Load, Export PDF
-    # Slightly taller toolbar so controls (like the PO# entry) won't be clipped
+    # Toolbar at the top
     toolbar = tk.Frame(content, bg=TOOLBAR_BG)
     toolbar.place(relx=0.02, rely=0.02, relwidth=0.96, relheight=0.10)
 
@@ -256,7 +246,7 @@ def build_ui():
         # Ignore style configuration errors on unsupported platforms/themes
         pass
 
-    # PO# entry var
+    # PO# entry variable
     po_entry_var = tk.StringVar()
 
     current = {"quote": None}
@@ -274,7 +264,6 @@ def build_ui():
             pass
 
     def clear_current():
-
         current["quote"] = None
         update_tree()
         update_totals()
@@ -327,50 +316,50 @@ def build_ui():
             current["quote"]["items"].append(item)
             update_tree()
             update_totals()
-            dlg.destroy()
+            add_part_window.destroy()
 
-        dlg = tk.Toplevel(root)
-        dlg.title("Add Part")
-        dlg.transient(root)
-        dlg.grab_set()
+        add_part_window = tk.Toplevel(root)
+        add_part_window.title("Add Part")
+        add_part_window.transient(root)
+        add_part_window.grab_set()
 
-        lbl_part = ttk.Label(dlg, text="Part #")
+        lbl_part = ttk.Label(add_part_window, text="Part #")
         lbl_part.grid(row=0, column=0, sticky="e")
-        ent_part = ttk.Entry(dlg)
+        ent_part = ttk.Entry(add_part_window)
         ent_part.grid(row=0, column=1, sticky="we")
 
-        lbl_desc = ttk.Label(dlg, text="Description")
+        lbl_desc = ttk.Label(add_part_window, text="Description")
         lbl_desc.grid(row=1, column=0, sticky="e")
-        ent_desc = ttk.Entry(dlg)
+        ent_desc = ttk.Entry(add_part_window)
         ent_desc.grid(row=1, column=1, sticky="we")
 
-        lbl_qty = ttk.Label(dlg, text="Qty")
+        lbl_qty = ttk.Label(add_part_window, text="Qty")
         lbl_qty.grid(row=2, column=0, sticky="e")
-        ent_qty = ttk.Entry(dlg)
+        ent_qty = ttk.Entry(add_part_window)
         ent_qty.insert(0, "1")
         ent_qty.grid(row=2, column=1, sticky="we")
 
-        lbl_unit = ttk.Label(dlg, text="Unit Cost")
+        lbl_unit = ttk.Label(add_part_window, text="Unit Cost")
         lbl_unit.grid(row=3, column=0, sticky="e")
-        ent_unit = ttk.Entry(dlg)
+        ent_unit = ttk.Entry(add_part_window)
         ent_unit.insert(0, "0.00")
         ent_unit.grid(row=3, column=1, sticky="we")
 
-        lbl_list = ttk.Label(dlg, text="List Price")
+        lbl_list = ttk.Label(add_part_window, text="List Price")
         lbl_list.grid(row=4, column=0, sticky="e")
-        ent_list = ttk.Entry(dlg)
+        ent_list = ttk.Entry(add_part_window)
         ent_list.insert(0, "0.00")
         ent_list.grid(row=4, column=1, sticky="we")
 
-        lbl_source = ttk.Label(dlg, text="Source")
+        lbl_source = ttk.Label(add_part_window, text="Source")
         lbl_source.grid(row=5, column=0, sticky="e")
-        ent_source = ttk.Entry(dlg)
+        ent_source = ttk.Entry(add_part_window)
         ent_source.grid(row=5, column=1, sticky="we")
 
-        btn = ttk.Button(dlg, text="Add", command=_submit)
+        btn = ttk.Button(add_part_window, text="Add", command=_submit)
         btn.grid(row=6, column=0, columnspan=2, pady=(8, 4))
 
-        dlg.columnconfigure(1, weight=1)
+        add_part_window.columnconfigure(1, weight=1)
 
     def update_tree():
         for r in tree.get_children():
@@ -418,7 +407,6 @@ def build_ui():
                 update_totals()
 
     def edit_item():
-
         sel = tree.selection()
         if not sel:
             messagebox.showinfo("Edit", "No item selected.")
@@ -448,53 +436,53 @@ def build_ui():
             it["line_total"] = round(it["quantity"] * it["unit_cost"], 2)
             update_tree()
             update_totals()
-            dlg.destroy()
+            edit_part_window.destroy()
 
-        dlg = tk.Toplevel(root)
-        dlg.title("Edit Part")
-        dlg.transient(root)
-        dlg.grab_set()
+        edit_part_window = tk.Toplevel(root)
+        edit_part_window.title("Edit Part")
+        edit_part_window.transient(root)
+        edit_part_window.grab_set()
 
-        lbl_part = ttk.Label(dlg, text="Part #")
+        lbl_part = ttk.Label(edit_part_window, text="Part #")
         lbl_part.grid(row=0, column=0, sticky="e")
-        ent_part = ttk.Entry(dlg)
+        ent_part = ttk.Entry(edit_part_window)
         ent_part.insert(0, it.get("part_number", ""))
         ent_part.grid(row=0, column=1, sticky="we")
 
-        lbl_desc = ttk.Label(dlg, text="Description")
+        lbl_desc = ttk.Label(edit_part_window, text="Description")
         lbl_desc.grid(row=1, column=0, sticky="e")
-        ent_desc = ttk.Entry(dlg)
+        ent_desc = ttk.Entry(edit_part_window)
         ent_desc.insert(0, it.get("description", ""))
         ent_desc.grid(row=1, column=1, sticky="we")
 
-        lbl_qty = ttk.Label(dlg, text="Qty")
+        lbl_qty = ttk.Label(edit_part_window, text="Qty")
         lbl_qty.grid(row=2, column=0, sticky="e")
-        ent_qty = ttk.Entry(dlg)
+        ent_qty = ttk.Entry(edit_part_window)
         ent_qty.insert(0, str(it.get("quantity", 1)))
         ent_qty.grid(row=2, column=1, sticky="we")
 
-        lbl_unit = ttk.Label(dlg, text="Unit Cost")
+        lbl_unit = ttk.Label(edit_part_window, text="Unit Cost")
         lbl_unit.grid(row=3, column=0, sticky="e")
-        ent_unit = ttk.Entry(dlg)
+        ent_unit = ttk.Entry(edit_part_window)
         ent_unit.insert(0, f"{it.get('unit_cost', 0.0):.2f}")
         ent_unit.grid(row=3, column=1, sticky="we")
 
-        lbl_list = ttk.Label(dlg, text="List Price")
+        lbl_list = ttk.Label(edit_part_window, text="List Price")
         lbl_list.grid(row=4, column=0, sticky="e")
-        ent_list = ttk.Entry(dlg)
+        ent_list = ttk.Entry(edit_part_window)
         ent_list.insert(0, f"{it.get('list_price', 0.0):.2f}")
         ent_list.grid(row=4, column=1, sticky="we")
 
-        lbl_source = ttk.Label(dlg, text="Source")
+        lbl_source = ttk.Label(edit_part_window, text="Source")
         lbl_source.grid(row=5, column=0, sticky="e")
-        ent_source = ttk.Entry(dlg)
+        ent_source = ttk.Entry(edit_part_window)
         ent_source.insert(0, it.get("source", ""))
         ent_source.grid(row=5, column=1, sticky="we")
 
-        btn = ttk.Button(dlg, text="Save", command=_submit_edit)
+        btn = ttk.Button(edit_part_window, text="Save", command=_submit_edit)
         btn.grid(row=6, column=0, columnspan=2, pady=(8, 4))
 
-        dlg.columnconfigure(1, weight=1)
+        edit_part_window.columnconfigure(1, weight=1)
 
     def save_current(silent=False):
         quotes = load_quotes()
@@ -700,6 +688,7 @@ def build_ui():
         c.drawString(72, y, q.get("name"))
         y -= 30
         c.setFont("Helvetica", 9)
+        # Table header
         for it in q.get("items", []):
             line = (
                 f"{it.get('part_number')} | {it.get('description')} | "
@@ -710,6 +699,7 @@ def build_ui():
             if y < 72:
                 c.showPage()
                 y = 750
+
         total = sum(it.get("line_total", 0.0) for it in q.get("items", []))
         y -= 10
         c.setFont("Helvetica-Bold", 12)
@@ -717,7 +707,7 @@ def build_ui():
         c.save()
         webbrowser.open("file://" + path)
 
-    # Use ttk buttons for native look (avoids odd backgrounds)
+    # Use ttk buttons for native look and feel
     # Create a small branding label with the app icon (if available) so the toolbar shows the correct icon
     try:
         _small_icon = None
@@ -741,32 +731,35 @@ def build_ui():
             brand_lbl = tk.Label(toolbar, image=_small_icon, compound="left", bg=TOOLBAR_BG, fg=FG)
             brand_lbl.pack(side="left", padx=(6, 8), pady=6)
         else:
-            # Still show a text-only label for clarity
+            # Pack a label anyway, gotta make it look consistent
             brand_lbl = tk.Label(toolbar, text=APP_TITLE, bg=TOOLBAR_BG, fg=FG)
             brand_lbl.pack(side="left", padx=(6, 8), pady=6)
     except Exception:
         # Non-fatal if PIL / image loading fails
         pass
+
     # Note: no transparent title-bar icon set here — leave OS/app icon behavior to earlier logic
     btn_new = ttk.Button(toolbar, text="New Quote", command=new_quote)
     btn_new.pack(side="left", padx=6, pady=6)
     btn_add = ttk.Button(toolbar, text="Add Part", command=add_part)
     btn_add.pack(side="left", padx=6, pady=6)
-    btn_edit = ttk.Button(toolbar, text="Edit Item", command=lambda: edit_item())
+    btn_edit = ttk.Button(toolbar, text="Edit Item", command=edit_item)
     btn_edit.pack(side="left", padx=6, pady=6)
-    btn_del = ttk.Button(toolbar, text="Delete Item", command=lambda: delete_item())
+    btn_del = ttk.Button(toolbar, text="Delete Item", command=delete_item)
     btn_del.pack(side="left", padx=6, pady=6)
     btn_save = ttk.Button(toolbar, text="Save Quote", command=save_current)
     btn_save.pack(side="left", padx=6, pady=6)
     btn_load = ttk.Button(toolbar, text="Load Quote", command=load_quote)
     btn_load.pack(side="left", padx=6, pady=6)
-    # small version label on the right
+
+    # Small version label on the right
     ver_lbl = ttk.Label(toolbar, text=VERSION)
     ver_lbl.pack(side="right", padx=6)
-    # Small platform label next to the version (small, unobtrusive)
+    # Small platform label next to the version 
     try:
+        platform_name_font_size = 10
         plat_name = "macOS" if platform.system() == "Darwin" else platform.system()
-        small_font = tkfont.Font(family="Helvetica", size=9)
+        small_font = tkfont.Font(family="Helvetica", size=platform_name_font_size)
         plat_lbl = tk.Label(toolbar, text=plat_name, bg=TOOLBAR_BG, fg=FG, font=small_font)
         plat_lbl.pack(side="right", padx=(0, 6))
     except Exception:
@@ -782,11 +775,9 @@ def build_ui():
             # Ask whether to save current quote before exiting (Yes/No/Cancel)
             ans = messagebox.askyesnocancel("Exit", "Save current quote before exiting?")
             if ans is None:
-                # Cancel
                 return
             if ans:
                 save_current()
-            # proceed to exit
             root.destroy()
         else:
             if messagebox.askyesno("Exit", "Are you sure you want to quit?"):
@@ -802,11 +793,12 @@ def build_ui():
     except Exception:
         pass
 
-    # PO# label and entry on the toolbar (left side so it's visible)
+    # PO# label and entry on the toolbar
     lbl_po = ttk.Label(toolbar, text="PO#")
     lbl_po.pack(side="left", padx=(12, 2))
     po_entry = ttk.Entry(toolbar, textvariable=po_entry_var, width=18)
     po_entry.pack(side="left", padx=(2, 12))
+    
     # Update current quote when PO entry loses focus or on Enter
     po_entry.bind("<Return>", lambda e: _set_po_from_entry())
     po_entry.bind("<FocusOut>", lambda e: _set_po_from_entry())
