@@ -1,4 +1,4 @@
-# ARC-Works (arcs.py)
+# ARCS
 
 [![Python](https://img.shields.io/badge/Python-3.8%2B-blue)](https://www.python.org/) [![Platform](https://img.shields.io/badge/Platform-macOS%20%7C%20Windows-brightgreen)]() [![Status](https://img.shields.io/badge/Status-Beta-yellow)]() [![UI](https://img.shields.io/badge/UI-Tkinter-orange)]()
 
