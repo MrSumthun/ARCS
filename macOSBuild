@@ -1,1 +1,32 @@
-pyinstaller --onefile --noconsole --name ARCS --icon=data/app.icns --add-data "data:./data" arcs.py
+#!/usr/bin/env zsh
+set -euo pipefail
+
+usage() {
+  echo "Usage: ./macOSBuild [--help]"
+  echo
+  echo "Builds a macOS one-file app using PyInstaller. Run on macOS."
+}
+
+if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+  usage
+  exit 0
+fi
+
+if [[ "$(uname)" != "Darwin" ]]; then
+  echo "Error: This script must be run on macOS (Darwin)."
+  exit 1
+fi
+
+if ! command -v pyinstaller >/dev/null 2>&1; then
+  echo "pyinstaller not found. Install with: pip3 install pyinstaller"
+  exit 1
+fi
+
+NAME="${2:-ARCS}"
+ICON="data/app.icns"
+ADDDATA="data:./data"
+
+echo "Building ${NAME} (onefile, noconsole) ..."
+pyinstaller --onefile --noconsole --name "${NAME}" --icon="${ICON}" --add-data "${ADDDATA}" arcs.py
+
+echo "Build finished. See the 'dist' directory for the ${NAME} bundle."
