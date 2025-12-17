@@ -3,6 +3,7 @@ __pycache__/
 *$py.class
 *.so
 *.dylib
+*.github/workflows
 
 # Distribution / packaging
 build/

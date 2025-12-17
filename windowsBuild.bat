@@ -1,1 +1,1 @@
-pyinstaller --onefile --noconsole --name ARCS --icon=data/app.ico --add-data "data;data" arcsoftware.py
+pyinstaller --onefile --noconsole --name ARCS --icon=data/app.ico --add-data "data;data" arcs.py
