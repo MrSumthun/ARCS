@@ -2,7 +2,7 @@
 
 
 a = Analysis(
-    ['arcsoftware.py'],
+    ['arcs.py'],
     pathex=[],
     binaries=[],
     datas=[('data', './data')],

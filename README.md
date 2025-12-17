@@ -4,8 +4,8 @@ Simple quoting / RFQ utility built with Tkinter.
 
 Quick notes (recent changes):
 
-- **Default window size:** 1000x700 (constants `DEFAULT_WIDTH` / `DEFAULT_HEIGHT` in `arcsoftware.py`).
-- **App title:** configured via `APP_TITLE` in `arcsoftware.py`.
+- **Default window size:** 1000x700 (constants `DEFAULT_WIDTH` / `DEFAULT_HEIGHT` in `arcs.py`).
+- **App title:** configured via `APP_TITLE` in `arcs.py`.
 - **Persistence:** quotes are stored in `data/quotes.json` (helper functions `load_quotes` / `save_quotes`).
 - **UI:** macOS-like dark-themed toolbar, PO# entry on the toolbar, notes area, and modern fonts.
 - **Export/Import:** per-quote JSON export/import from the Load dialog; PDF export uses ReportLab when available, with an HTML fallback that opens in the browser.
@@ -13,24 +13,24 @@ Quick notes (recent changes):
 
 How to customize:
 
-- Change the default window size by editing `DEFAULT_WIDTH` / `DEFAULT_HEIGHT` in `arcsoftware.py`.
-- Update `APP_TITLE` or `VERSION` at the top of `arcsoftware.py` to reflect branding/versioning.
+- Change the default window size by editing `DEFAULT_WIDTH` / `DEFAULT_HEIGHT` in `arcs.py`.
+- Update `APP_TITLE` or `VERSION` at the top of `arcs.py` to reflect branding/versioning.
 
 If you want, I can add a README section describing other developer notes (tests, CI, or packaging).
 
 ## Developer Notes 🔧
 
-- Run the app: `python3 arcsoftware.py` (requires Python 3.8+).
+- Run the app: `python3 arcs.py` (requires Python 3.8+).
 - Optional dependencies:
 	- `Pillow` — improves icon loading and resizing
 	- `reportlab` — used for direct PDF export (fallback: HTML opened in browser)
 	- `pytest` — only needed if adding unit tests
 	Install with: `pip3 install pillow reportlab pytest`
 - Important files:
-	- `arcsoftware.py` — main application (UI, persistence, export/import)
+	- `arcs.py` — main application (UI, persistence, export/import)
 	- `data/quotes.json` — persistent store for saved quotes (created on first save)
 	- `data/employees.json` — default employee list used for seeding
-- Key configuration constants in `arcsoftware.py`:
+- Key configuration constants in `arcs.py`:
 	- `DEFAULT_WIDTH` / `DEFAULT_HEIGHT` — default window size
 	- `APP_TITLE`, `VERSION` — app metadata
 	- `QUOTES_FILE` — path to the persistent JSON file
@@ -42,6 +42,11 @@ If you want, I can add a README section describing other developer notes (tests,
 
 If you'd like, I can add a `requirements.txt` or a `pyproject.toml` entry for these optional dev dependencies.
 
+## Note: file rename 🔁
+
+- The main application module has been renamed from `arcsoftware.py` to **`arcs.py`**. Build scripts (`macOSBuild`, `windowsBuild.bat`) and the PyInstaller spec (`ARCS.spec`) have been updated to reference `arcs.py`.
+- If you have local tooling or shortcuts that referenced `arcsoftware.py`, update them to `arcs.py` (or keep a copy of the old filename if you prefer compatibility).
+
 ## macOS Build (PyInstaller)
 
 When building a macOS GUI app with PyInstaller, build on macOS and include your `data/` folder and an `.icns` icon.
@@ -49,12 +54,12 @@ When building a macOS GUI app with PyInstaller, build on macOS and include your 
 Recommended command:
 
 ```bash
-pyinstaller --onefile --noconsole --icon=data/app.icns --add-data "data:./data" arcsoftware.py
+pyinstaller --onefile --noconsole --icon=data/app.icns --add-data "data:./data" arcs.py
 ```
 
 Notes:
 - Use `:` as the `--add-data` separator on macOS/Linux. The `--icon` for macOS should be an `.icns` file.
-- The app should use a `resource_path()` helper (already in `arcsoftware.py`) so bundled resources are located via `sys._MEIPASS` at runtime.
+- The app should use a `resource_path()` helper (already in `arcs.py`) so bundled resources are located via `sys._MEIPASS` at runtime.
 
 Convert a PNG to `.icns` on macOS:
 
@@ -89,7 +94,7 @@ If you prefer a non-onefile build for easier debugging of bundled resources, omi
 
 1. Ensure Python 3.8+ is installed.
 2. (Optional) Install dev dependencies: `pip3 install pillow reportlab pytest`
-3. Run the app: `python3 arcsoftware.py`
+3. Run the app: `python3 arcs.py`
 4. Create a new quote, add parts, and use **Save Quote** to persist it to `data/quotes.json`.
 5. Use **Load Quote** to load, export (JSON), or import a single quote.
 
@@ -101,7 +106,7 @@ If you prefer a non-onefile build for easier debugging of bundled resources, omi
 
 - If icons don't appear correctly on macOS, install `Pillow` to improve icon handling (`pip3 install pillow`).
 - If PDF export does not work, either install `reportlab` or print via the browser when the HTML fallback opens.
-- If the app fails to start, run `python3 -m py_compile arcsoftware.py` to check for syntax errors.
+- If the app fails to start, run `python3 -m py_compile arcs.py` to check for syntax errors.
 
 ## Contributing 🤝
 
