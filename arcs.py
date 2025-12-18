@@ -15,7 +15,7 @@ import re
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 
 # App metadata and UI defaults
-VERSION = "1.0.1"
+VERSION = "1.0.2 Beta"
 APP_TITLE = "ARC-Works Quote Manager"
 
 # Default window size (can be customized)
@@ -67,7 +67,7 @@ if not logger.handlers:
     fh.setFormatter(fmt)
     logger.addHandler(fh)
 
-
+# Atomic write helper for JSON files
 def atomic_write_json(path, data):
     dirpath = os.path.dirname(path)
     os.makedirs(dirpath, exist_ok=True)
@@ -280,8 +280,8 @@ def build_ui():
             pass
 
     def new_quote():
-        q = _new_quote_template()
-        set_current_quote(q)
+        quoteTemplate = _new_quote_template()
+        set_current_quote(quoteTemplate)
         po_entry_var.set("")
         # clear notes area
         try:
