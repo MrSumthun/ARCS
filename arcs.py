@@ -10,6 +10,11 @@ import platform
 from tkinter import ttk, messagebox, filedialog
 import tkinter.font as tkfont
 import re
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
+from reportlab.platypus import Table, TableStyle
+from reportlab.lib import colors
+from reportlab.lib.units import inch
 
 # Path to data directory (for bundled resources)
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
@@ -30,8 +35,6 @@ FG = "#e8e8e8"  # primary foreground (text)
 SELECT_BG = "#2b6fb6"  # selection color for rows
 
 # Helper to get resource path, works for dev and PyInstaller bundles
-
-
 def resource_path(rel_path):
     if getattr(sys, "frozen", False):
         return os.path.join(sys._MEIPASS, rel_path)
@@ -43,8 +46,6 @@ BUNDLED_QUOTES_FILE = resource_path(os.path.join("data", "quotes.json"))
 APP_ICON = resource_path(os.path.join("data", "app.ico"))
 
 # User data directory (for writable files)
-
-
 def user_data_dir():
     home = os.path.expanduser("~")
     d = os.path.join(home, ".arcsoftware")
@@ -638,54 +639,7 @@ def build_ui():
         if not q:
             messagebox.showinfo("Export", "No current quote to export.")
             return
-        try:
-            from reportlab.lib.pagesizes import letter
-            from reportlab.pdfgen import canvas
-            from reportlab.platypus import Table, TableStyle
-            from reportlab.lib import colors
-            from reportlab.lib.units import inch
-        except Exception:
-            # fallback: write HTML and open in browser for printing to PDF
-            html = ['<html><head><meta charset="utf-8"><title>Quote</title></head><body>']
-            html.append("<h1>ARC-Works</h1>")
-            html.append(f"<h2>{q.get('name')}</h2>")
-            html.append('<table border="1" cellspacing="0" cellpadding="4">')
-            header = (
-                "<tr>"
-                "<th>Part</th>"
-                "<th>Description</th>"
-                "<th>Qty</th>"
-                "<th>Unit</th>"
-                "<th>List</th>"
-                "<th>Source</th>"
-                "<th>Line</th>"
-                "</tr>"
-            )
-            html.append(header)
-            for it in q.get("items", []):
-                row = (
-                    "<tr>"
-                    f"<td>{it.get('part_number')}</td>"
-                    f"<td>{it.get('description')}</td>"
-                    f"<td>{it.get('quantity')}</td>"
-                    f"<td>{(it.get('unit_cost') or 0.0):.2f}</td>"
-                    f"<td>{(it.get('list_price') or 0.0):.2f}</td>"
-                    f"<td>{it.get('source')}</td>"
-                    f"<td>{(it.get('line_total') or 0.0):.2f}</td>"
-                    "</tr>"
-                )
-                html.append(row)
-            html.append("</table>")
-            total = sum(it.get("line_total", 0.0) for it in q.get("items", []))
-            html.append(f"<p><strong>Total: ${total:.2f}</strong></p>")
-            html.append("</body></html>")
-            fd, path = tempfile.mkstemp(suffix=".html")
-            with os.fdopen(fd, "w") as f:
-                f.write("\n".join(html))
-            webbrowser.open("file://" + path)
-            return
-
-        # If reportlab available, generate PDF
+        # Create a temporary PDF file and open it in the default viewer
         fd, path = tempfile.mkstemp(suffix=".pdf")
         os.close(fd)
         c = canvas.Canvas(path, pagesize=letter)
@@ -699,19 +653,14 @@ def build_ui():
         # Page margins / left-right offset
         left = 72
         right = 72
-        # Add PO# under the quote name (if present)
         po = q.get('po_number')
         if po:
             c.setFont("Helvetica", 10)
             c.drawString(left, y, f"PO#: {po}")
             y -= 16
 
-        # Build a formal table using ReportLab platypus Table for aligned columns and totals
         available_width = letter[0] - left - right
-        # Column widths (in inches) chosen to fit the printable area. Increased first column for more spacing.
         col_widths = [0.6 * inch, 1.2 * inch, 3.2 * inch, 0.6 * inch, 0.9 * inch, 0.9 * inch]
-
-        # Prepare table data with header
         data = [["No", "Part", "Description", "Qty", "Unit", "Line"]]
         for idx, it in enumerate(q.get("items", []), start=1):
             data.append([
@@ -724,11 +673,9 @@ def build_ui():
             ])
 
         total = sum(it.get("line_total", 0.0) for it in q.get("items", []))
-        # Add a totals row
         data.append(["", "", "", "", "Total", f"${total:.2f}"])
 
         table = Table(data, colWidths=col_widths)
-        # Repeat the header row if table splits across pages
         table.repeatRows = 1
         table.setStyle(TableStyle([
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
@@ -750,7 +697,6 @@ def build_ui():
         w, h = table.wrapOn(c, available_width, y)
         if h > (y - 72):
             c.showPage()
-            # Redraw the document header on the new page
             y = 750
             c.setFont("Helvetica-Bold", 16)
             c.drawString(left, y, "ARC-Works")
@@ -758,7 +704,6 @@ def build_ui():
             c.setFont("Helvetica-Bold", 14)
             c.drawString(left, y, q.get("name"))
             y -= 30
-            # Re-draw PO# on new page as well
             po = q.get('po_number')
             if po:
                 c.setFont("Helvetica", 10)
@@ -771,8 +716,6 @@ def build_ui():
         c.save()
         webbrowser.open("file://" + path)
 
-    # Use ttk buttons for native look and feel
-    # Create a small branding label with the app icon (if available) so the toolbar shows the correct icon
     try:
         _small_icon = None
         if APP_ICON and os.path.exists(APP_ICON):
@@ -799,10 +742,9 @@ def build_ui():
             brand_lbl = tk.Label(toolbar, text=APP_TITLE, bg=TOOLBAR_BG, fg=FG)
             brand_lbl.pack(side="left", padx=(6, 8), pady=6)
     except Exception:
-        # Non-fatal if PIL / image loading fails
+        logger.debug("Failed to load toolbar icon:", exc_info=True)
         pass
 
-    # Note: no transparent title-bar icon set here — leave OS/app icon behavior to earlier logic
     btn_new = ttk.Button(toolbar, text="New Quote", command=new_quote)
     btn_new.pack(side="left", padx=6, pady=6)
     btn_add = ttk.Button(toolbar, text="Add Part", command=add_part)
@@ -815,11 +757,9 @@ def build_ui():
     btn_save.pack(side="left", padx=6, pady=6)
     btn_load = ttk.Button(toolbar, text="Load Quote", command=load_quote)
     btn_load.pack(side="left", padx=6, pady=6)
-
-    # Small version label on the right
     ver_lbl = ttk.Label(toolbar, text=VERSION)
     ver_lbl.pack(side="right", padx=6)
-    # Small platform label next to the version
+
     try:
         platform_name_font_size = 10
         plat_name = "macOS" if platform.system() == "Darwin" else platform.system()
@@ -829,14 +769,12 @@ def build_ui():
     except Exception:
         pass
 
-    # On macOS, we do not set a transparent titlebar icon here (leave defaults)
     btn_pdf = ttk.Button(toolbar, text="Export PDF", command=export_pdf)
     btn_pdf.pack(side="right", padx=6, pady=6)
 
     def _exit_app(event=None):
         q = current.get("quote")
         if q:
-            # Ask whether to save current quote before exiting (Yes/No/Cancel)
             ans = messagebox.askyesnocancel("Exit", "Save current quote before exiting?")
             if ans is None:
                 return
@@ -849,13 +787,6 @@ def build_ui():
 
     btn_exit = ttk.Button(toolbar, text="Exit", command=_exit_app)
     btn_exit.pack(side="right", padx=6, pady=6)
-    # keyboard accelerator for exit
-    try:
-        root.bind_all("<Control-q>", _exit_app)
-        # Ensure window close button also uses the same exit flow
-        root.protocol("WM_DELETE_WINDOW", _exit_app)
-    except Exception:
-        pass
 
     # PO# label and entry on the toolbar
     lbl_po = ttk.Label(toolbar, text="PO#")
@@ -865,11 +796,8 @@ def build_ui():
     # Update current quote when PO entry loses focus or on Enter
     po_entry.bind("<Return>", lambda e: _set_po_from_entry())
     po_entry.bind("<FocusOut>", lambda e: _set_po_from_entry())
-
-    # Tree view to display items
     cols = ("part", "desc", "qty", "unit", "list", "source", "line")
     tree = ttk.Treeview(content, columns=cols, show="headings")
-    # leave a notes area at the bottom
     tree.place(relx=0.02, rely=0.12, relwidth=0.96, relheight=0.60)
     headings = ["Part #", "Description", "Qty", "Unit Cost", "List Price", "Source", "Line Total"]
     for c, h in zip(cols, headings):
@@ -911,11 +839,7 @@ def build_ui():
 
     lbl_total = tk.Label(content, text="Total: $0.00", bg=bg_color)
     lbl_total.place(relx=0.02, rely=0.75)
-    # use modern font/color for total label
-    try:
-        lbl_total.configure(font=button_font, foreground=FG)
-    except Exception:
-        pass
+    lbl_total.configure(font=button_font, foreground=FG)
 
     # Notes area (dark background, visible border, modern font)
     notes_frame = tk.Frame(content, bg=PANEL_BG, bd=0)
