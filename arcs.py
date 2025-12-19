@@ -114,6 +114,7 @@ def build_ui():
                 root._icon_img = _img
             except Exception:
                 from PIL import Image, ImageTk
+
                 img = Image.open(APP_ICON)
                 imgtk = ImageTk.PhotoImage(img)
                 root.iconphoto(True, imgtk)
@@ -692,9 +693,7 @@ def build_ui():
     platform_name_font_size = 10
     plat_name = "macOS" if platform.system() == "Darwin" else platform.system()
     small_font = tkfont.Font(family="Helvetica", size=platform_name_font_size)
-    plat_lbl = tk.Label(
-        toolbar, text=plat_name, bg=TOOLBAR_BG, fg=FG, font=small_font
-    )
+    plat_lbl = tk.Label(toolbar, text=plat_name, bg=TOOLBAR_BG, fg=FG, font=small_font)
     plat_lbl.pack(side="right", padx=(0, 6))
 
     btn_pdf = ttk.Button(toolbar, text="Export PDF", command=export_pdf)
