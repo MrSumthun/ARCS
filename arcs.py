@@ -14,7 +14,6 @@ from reportlab.platypus import Table, TableStyle
 from reportlab.lib import colors
 from reportlab.lib.units import inch
 
-# Local helpers
 from arcs_utils import (
     get_resource_path,
     user_data_dir,
@@ -26,23 +25,16 @@ from arcs_utils import (
 )
 
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
-
 VERSION = "1.0.3-beta"
 APP_NAME = "ARCS"
 APP_TITLE = "ARCS Quote Manager"
-
-# Default window size (can be customized)
 DEFAULT_WIDTH = 1000
 DEFAULT_HEIGHT = 700
-
-# UI color scheme for dark mode
 UI_BG = "#1f1f1f"  # main window background
 TOOLBAR_BG = "#2a2a2a"  # toolbar background
 PANEL_BG = "#141414"  # panels / tree background
 FG = "#e8e8e8"  # primary foreground (text)
 SELECT_BG = "#2b6fb6"  # selection color for rows
-
-# Bundled resources (resolve with `get_resource_path` from `arcs_utils`)
 BUNDLED_QUOTES_FILE = get_resource_path(os.path.join("data", "quotes.json"))
 APP_ICON = get_resource_path(os.path.join("data", "app.ico"))
 QUOTES_FILE = os.path.join(user_data_dir(), "quotes.json")
@@ -92,7 +84,6 @@ def _safe_filename(name):
     return safe_filename(name)
 
 
-# Center the window on the screen
 def _center_window(root, width=DEFAULT_WIDTH, height=DEFAULT_HEIGHT):
     screen_w = root.winfo_screenwidth()
     screen_h = root.winfo_screenheight()
@@ -108,41 +99,27 @@ def build_ui():
     root.configure(bg=bg_color)
     root.minsize(900, 600)
     _center_window(root, DEFAULT_WIDTH, DEFAULT_HEIGHT)
-    # Try to set window icon if provided
-    try:
-        if APP_ICON and os.path.exists(APP_ICON):
-            tried = False
+    if APP_ICON and os.path.exists(APP_ICON):
+        tried = False
+        try:
+            root.iconbitmap(APP_ICON)
+            tried = True
+        except Exception:
+            logger.debug("iconbitmap failed for %s", APP_ICON)
+            pass
+        if not tried or platform.system() != "Windows":
             try:
-                root.iconbitmap(APP_ICON)
-                tried = True
+                _img = tk.PhotoImage(file=APP_ICON)
+                root.iconphoto(True, _img)
+                root._icon_img = _img
             except Exception:
-                logger.debug("iconbitmap failed for %s", APP_ICON)
-                pass
-            if not tried or platform.system() != "Windows":
-                try:
-                    _img = tk.PhotoImage(file=APP_ICON)
-                    root.iconphoto(True, _img)
-                    root._icon_img = _img
-                except Exception:
-                    try:
-                        from PIL import Image, ImageTk
+                from PIL import Image, ImageTk
+                img = Image.open(APP_ICON)
+                imgtk = ImageTk.PhotoImage(img)
+                root.iconphoto(True, imgtk)
+                root._icon_img = imgtk
 
-                        img = Image.open(APP_ICON)
-                        imgtk = ImageTk.PhotoImage(img)
-                        root.iconphoto(True, imgtk)
-                        root._icon_img = imgtk
-                    except Exception:
-                        # ignore if neither method works; leaving default Tk icon
-                        logger.debug(
-                            "Failed to set iconphoto for %s", APP_ICON, exc_info=True
-                        )
-                        pass
-    except Exception:
-        # ignore platforms that don't support icon changes or if setting fails
-        logger.debug("Failed to set window icon for %s", APP_ICON, exc_info=True)
-        pass
-
-    # Main content area fills the window (no header)
+    # Main content area
     content = tk.Frame(root, bg=bg_color)
     content.place(relx=0, rely=0, relwidth=1, relheight=1)
     toolbar = tk.Frame(content, bg=TOOLBAR_BG)
@@ -157,11 +134,7 @@ def build_ui():
     body_font = tkfont.Font(family=base_family, size=11)
     heading_font = tkfont.Font(family=base_family, size=11, weight="bold")
     button_font = tkfont.Font(family=base_family, size=10)
-
-    try:
-        style.theme_use("clam")
-    except Exception:
-        pass
+    style.theme_use("clam")
     try:
         style.configure(
             "Treeview",
@@ -434,17 +407,14 @@ def build_ui():
         if not q:
             logger.debug("save_current called with no current quote")
             return
-        # ensure notes are saved from the notes text area
         try:
             q["notes"] = notes_text.get("1.0", "end").rstrip("\n")
         except Exception as e:
             logger.debug("Failed to read notes text: %s", e)
-            # normalize quote name to 'ARC YYYY-MM-DD [PO:xxx]' when saving
             try:
                 q["name"] = format_quote_name(q)
             except Exception:
                 logger.debug("Failed to normalize quote name for id=%s", q.get("id"))
-        # replace if exists
         existing = [x for x in quotes if x.get("id") == q.get("id")]
         if existing:
             quotes = [x for x in quotes if x.get("id") != q.get("id")]
@@ -471,7 +441,6 @@ def build_ui():
         def _quote_label(q):
             po = q.get("po_number")
             po_str = f" [PO:{po}]" if po else ""
-            # Hide internal id from the UI; show standardized name + PO and item count
             return f"{q.get('name')}{po_str} ({len(q.get('items', []))} items)"
 
         load_quote_window = tk.Toplevel(root)
@@ -504,11 +473,9 @@ def build_ui():
                 "Delete Quote", f"Delete quote '{q.get('name')}'?"
             ):
                 return
-            # remove and save
             del quotes[idx]
             save_quotes(quotes)
             lb.delete(idx)
-            # if the deleted quote was loaded, clear current
             if current.get("quote") and current["quote"].get("id") == q.get("id"):
                 clear_current()
 
@@ -519,7 +486,6 @@ def build_ui():
                 return
             idx = int(sel[0])
             q = quotes[idx]
-            # Suggest a safe filename based on standardized quote name
             suggested = _safe_filename(format_quote_name(q))
             fn = filedialog.asksaveasfilename(
                 defaultextension=".json",
@@ -544,19 +510,16 @@ def build_ui():
             except Exception as e:
                 messagebox.showerror("Import Quote", f"Failed to read file: {e}")
                 return
-            # payload should be a dict representing a quote
             if not isinstance(payload, dict) or "items" not in payload:
                 messagebox.showerror(
                     "Import Quote", "File does not appear to be a valid quote JSON."
                 )
                 return
-            # avoid id collision: if same id exists, assign a new id
             existing_ids = {x.get("id") for x in quotes}
             if payload.get("id") in existing_ids:
                 payload["id"] = int(
                     datetime.datetime.now(datetime.timezone.utc).timestamp()
                 )
-            # normalize imported quote name to project format
             try:
                 payload["name"] = format_quote_name(payload)
             except Exception:
@@ -709,7 +672,7 @@ def build_ui():
             brand_lbl = tk.Label(toolbar, text=APP_TITLE, bg=TOOLBAR_BG, fg=FG)
             brand_lbl.pack(side="left", padx=(6, 8), pady=6)
     except Exception:
-        logger.debug("Failed to load toolbar icon:", exc_info=True)
+        logger.debug("Failed to load toolbar icon: ", exc_info=True)
         pass
 
     btn_new = ttk.Button(toolbar, text="New Quote", command=new_quote)
@@ -726,17 +689,13 @@ def build_ui():
     btn_load.pack(side="left", padx=6, pady=6)
     ver_lbl = ttk.Label(toolbar, text=VERSION)
     ver_lbl.pack(side="right", padx=6)
-
-    try:
-        platform_name_font_size = 10
-        plat_name = "macOS" if platform.system() == "Darwin" else platform.system()
-        small_font = tkfont.Font(family="Helvetica", size=platform_name_font_size)
-        plat_lbl = tk.Label(
-            toolbar, text=plat_name, bg=TOOLBAR_BG, fg=FG, font=small_font
-        )
-        plat_lbl.pack(side="right", padx=(0, 6))
-    except Exception:
-        pass
+    platform_name_font_size = 10
+    plat_name = "macOS" if platform.system() == "Darwin" else platform.system()
+    small_font = tkfont.Font(family="Helvetica", size=platform_name_font_size)
+    plat_lbl = tk.Label(
+        toolbar, text=plat_name, bg=TOOLBAR_BG, fg=FG, font=small_font
+    )
+    plat_lbl.pack(side="right", padx=(0, 6))
 
     btn_pdf = ttk.Button(toolbar, text="Export PDF", command=export_pdf)
     btn_pdf.pack(side="right", padx=6, pady=6)
