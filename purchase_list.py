@@ -146,15 +146,25 @@ def print_per_quote(quotes: List[Dict[str, Any]]):
 
 
 def main(argv=None):
-    p = argparse.ArgumentParser(description="Aggregate parts across saved quotes for purchasing")
-    p.add_argument("--file", "-f", help="Path to quotes.json to use (overrides defaults)")
+    p = argparse.ArgumentParser(
+        description="Aggregate parts across saved quotes for purchasing"
+    )
+    p.add_argument(
+        "--file", "-f", help="Path to quotes.json to use (overrides defaults)"
+    )
     p.add_argument("--json", action="store_true", help="Output JSON instead of a table")
-    p.add_argument("--aggregate", action="store_true", help="Aggregate parts across all quotes (legacy behavior)")
+    p.add_argument(
+        "--aggregate",
+        action="store_true",
+        help="Aggregate parts across all quotes (legacy behavior)",
+    )
     args = p.parse_args(argv)
 
     qf = find_quotes_file(args.file)
     if not qf:
-        print("No quotes file found (tried user data and bundled data). Create a quote first.")
+        print(
+            "No quotes file found (tried user data and bundled data). Create a quote first."
+        )
         return 2
 
     quotes = load_quotes_from(qf)
@@ -189,11 +199,15 @@ def main(argv=None):
                             entry["unit_cost"] = unit
                         if listp < entry.get("list_price", listp):
                             entry["list_price"] = listp
-                per.append({
-                    "quote": q.get("name") or f"Quote {i}",
-                    "po": q.get("po_number"),
-                    "parts": sorted(agg.values(), key=lambda x: (x["part_number"], x["source"]))
-                })
+                per.append(
+                    {
+                        "quote": q.get("name") or f"Quote {i}",
+                        "po": q.get("po_number"),
+                        "parts": sorted(
+                            agg.values(), key=lambda x: (x["part_number"], x["source"])
+                        ),
+                    }
+                )
             print(json.dumps(per, indent=2))
             return 0
         else:

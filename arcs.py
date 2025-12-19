@@ -3,28 +3,36 @@ import os
 import tempfile
 import datetime
 import webbrowser
-import sys
 import logging
 import tkinter as tk
 import platform
 from tkinter import ttk, messagebox, filedialog
 import tkinter.font as tkfont
-import re
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 from reportlab.platypus import Table, TableStyle
 from reportlab.lib import colors
 from reportlab.lib.units import inch
 
-# Path to data directory (for bundled resources)
+# Local helpers
+from arcs_utils import (
+    get_resource_path,
+    user_data_dir,
+    load_json_file,
+    save_json_file,
+    create_quote,
+    normalize_quote_name,
+    safe_filename,
+)
+
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 
-# App metadata and UI defaults
-VERSION = "1.0.2 Beta"
-APP_TITLE = "ARC-Works Quote Manager"
+VERSION = "1.0.3-beta"
+APP_NAME = "ARCS"
+APP_TITLE = "ARCS Quote Manager"
 
 # Default window size (can be customized)
-DEFAULT_WIDTH = 1200
+DEFAULT_WIDTH = 1000
 DEFAULT_HEIGHT = 700
 
 # UI color scheme for dark mode
@@ -34,29 +42,10 @@ PANEL_BG = "#141414"  # panels / tree background
 FG = "#e8e8e8"  # primary foreground (text)
 SELECT_BG = "#2b6fb6"  # selection color for rows
 
-# Helper to get resource path, works for dev and PyInstaller bundles
-def resource_path(rel_path):
-    if getattr(sys, "frozen", False):
-        return os.path.join(sys._MEIPASS, rel_path)
-    return os.path.join(os.path.dirname(__file__), rel_path)
-
-
-# Bundled resources
-BUNDLED_QUOTES_FILE = resource_path(os.path.join("data", "quotes.json"))
-APP_ICON = resource_path(os.path.join("data", "app.ico"))
-
-# User data directory (for writable files)
-def user_data_dir():
-    home = os.path.expanduser("~")
-    d = os.path.join(home, ".arcsoftware")
-    os.makedirs(d, exist_ok=True)
-    return d
-
-
-# Default user-writable quotes file (outside the bundled app)
+# Bundled resources (resolve with `get_resource_path` from `arcs_utils`)
+BUNDLED_QUOTES_FILE = get_resource_path(os.path.join("data", "quotes.json"))
+APP_ICON = get_resource_path(os.path.join("data", "app.ico"))
 QUOTES_FILE = os.path.join(user_data_dir(), "quotes.json")
-
-# Logging setup: write runtime logs to the user data dir
 LOG_FILE = os.path.join(user_data_dir(), "arcsoftware.log")
 logger = logging.getLogger("arcsoftware")
 
@@ -68,91 +57,41 @@ if not logger.handlers:
     fh.setFormatter(fmt)
     logger.addHandler(fh)
 
-# Atomic write helper for JSON files
-def atomic_write_json(path, data):
-    dirpath = os.path.dirname(path)
-    os.makedirs(dirpath, exist_ok=True)
-    fd, tmp_path = tempfile.mkstemp(dir=dirpath)
-    try:
-        with os.fdopen(fd, "w") as tmpf:
-            json.dump(data, tmpf, indent=4, default=str)
-        os.replace(tmp_path, path)
-    finally:
-        if os.path.exists(tmp_path):
-            try:
-                os.remove(tmp_path)
-            except OSError:
-                pass
-
-
 def load_quotes():
-    # Prefer user-writable quotes file; fall back to bundled defaults if missing
     try:
-        with open(QUOTES_FILE, "r") as f:
-            data = json.load(f)
-            logger.debug("Loaded %d quotes from %s", len(data), QUOTES_FILE)
+        data = load_json_file(QUOTES_FILE)
+        logger.debug("Loaded %d quotes from %s", len(data), QUOTES_FILE)
+        if data:
             return data
-    except (FileNotFoundError, json.JSONDecodeError) as e:
-        logger.debug("User quotes file not available or invalid (%s): %s", QUOTES_FILE, e)
-        # Try bundled defaults inside the package
-        try:
-            with open(BUNDLED_QUOTES_FILE, "r") as f:
-                data = json.load(f)
-                logger.debug("Loaded %d bundled quotes from %s", len(data), BUNDLED_QUOTES_FILE)
-                return data
-        except Exception as e2:
-            logger.debug("No bundled quotes or failed to read bundled file: %s", e2)
-            return []
+    except Exception:
+        logger.debug("Failed to load user quotes from %s", QUOTES_FILE, exc_info=True)
+
+    data = load_json_file(BUNDLED_QUOTES_FILE)
+    logger.debug("Loaded %d bundled quotes from %s", len(data), BUNDLED_QUOTES_FILE)
+    return data or []
 
 
 def save_quotes(quotes):
-    # Always write to the user-writable quotes file (not the bundled resource)
     try:
-        atomic_write_json(QUOTES_FILE, quotes)
+        save_json_file(QUOTES_FILE, quotes)
         logger.info("Saved %d quotes to %s", len(quotes), QUOTES_FILE)
-    except Exception as e:
-        logger.exception("Failed to save quotes to %s: %s", QUOTES_FILE, e)
+    except Exception:
+        logger.exception("Failed to save quotes to %s", QUOTES_FILE)
 
 
 def _new_quote_template(name=None):
-    # Use timezone-aware UTC datetimes to avoid deprecation warnings for utcnow()
-    now = datetime.datetime.now(datetime.timezone.utc)
-    return {
-        "id": int(now.timestamp()),
-        # default name: company prefix + date (YYYY-MM-DD)
-        "name": name or f"ARC {now.strftime('%Y-%m-%d')}",
-        "created_at": now.isoformat(),
-        "items": [],
-        "notes": "",
-    }
+    return create_quote(name)
 
 
 def format_quote_name(q):
-    # Return standardized name: 'ARC YYYY-MM-DD [PO:xxx]' (PO optional)
-    created_at = q.get("created_at")
-    if created_at:
-        try:
-            dt = datetime.datetime.fromisoformat(created_at)
-            date_str = dt.date().isoformat()
-        except Exception:
-            date_str = str(created_at)[:10]
-    else:
-        date_str = datetime.datetime.now(datetime.timezone.utc).date().isoformat()
-    name = f"Quote{date_str}"
-    po = q.get("po_number")
-    if po:
-        name = f"{name} [PO:{po}]"
-    return name
+    return normalize_quote_name(q)
 
 
 def _safe_filename(name):
-    # Replace unsafe characters with underscore and trim length
-    fname = re.sub(r"[^A-Za-z0-9._-]", "_", name)
-    return fname[:120]
+    return safe_filename(name)
 
-
+# Center the window on the screen
 def _center_window(root, width=DEFAULT_WIDTH, height=DEFAULT_HEIGHT):
-    # Center the window on the screen
     screen_w = root.winfo_screenwidth()
     screen_h = root.winfo_screenheight()
     x = int((screen_w - width) / 2)
@@ -170,23 +109,19 @@ def build_ui():
     # Try to set window icon if provided
     try:
         if APP_ICON and os.path.exists(APP_ICON):
-            # On Windows, .ico with iconbitmap tends to work. On macOS/Linux, prefer .icns
             tried = False
-            # Try iconbitmap first (works on Windows)
             try:
                 root.iconbitmap(APP_ICON)
                 tried = True
             except Exception:
+                logger.debug("iconbitmap failed for %s", APP_ICON)
                 pass
-            # If that didn't set the icon or on non-Windows, try PhotoImage (png/gif) then Pillow fallback
             if not tried or platform.system() != "Windows":
-                # Try PhotoImage (supports PNG/GIF). Many .ico files aren't supported by PhotoImage on macOS.
                 try:
                     _img = tk.PhotoImage(file=APP_ICON)
                     root.iconphoto(True, _img)
                     root._icon_img = _img
                 except Exception:
-                    # Fallback: if Pillow is available, use it to read the .ico (or other) and convert to a PhotoImage
                     try:
                         from PIL import Image, ImageTk
 
@@ -196,27 +131,25 @@ def build_ui():
                         root._icon_img = imgtk
                     except Exception:
                         # ignore if neither method works; leaving default Tk icon
+                        logger.debug("Failed to set iconphoto for %s", APP_ICON, exc_info=True)
                         pass
     except Exception:
         # ignore platforms that don't support icon changes or if setting fails
+        logger.debug("Failed to set window icon for %s", APP_ICON, exc_info=True)
         pass
 
     # Main content area fills the window (no header)
     content = tk.Frame(root, bg=bg_color)
     content.place(relx=0, rely=0, relwidth=1, relheight=1)
-    # Toolbar at the top
     toolbar = tk.Frame(content, bg=TOOLBAR_BG)
     toolbar.place(relx=0.02, rely=0.02, relwidth=0.96, relheight=0.10)
-
-    # Configure ttk styles for dark mode and modern fonts
     style = ttk.Style(root)
 
-    # define fonts up-front so they're available even if style configuration fails
-    # Choose platform-appropriate base font for better Windows compatibility
     if platform.system() == "Windows":
         base_family = "Segoe UI"
     else:
         base_family = "Helvetica"
+
     body_font = tkfont.Font(family=base_family, size=11)
     heading_font = tkfont.Font(family=base_family, size=11, weight="bold")
     button_font = tkfont.Font(family=base_family, size=10)
@@ -226,34 +159,45 @@ def build_ui():
     except Exception:
         pass
     try:
-
         style.configure(
-            "Treeview", background=PANEL_BG, fieldbackground=PANEL_BG, foreground=FG, rowheight=26, font=body_font
+            "Treeview",
+            background=PANEL_BG,
+            fieldbackground=PANEL_BG,
+            foreground=FG,
+            rowheight=26,
+            font=body_font,
         )
-        style.configure("Treeview.Heading", background=TOOLBAR_BG, foreground=FG, font=heading_font)
-        # Only change appearance for selected vs non-selected; avoid hover ('active') or focus mappings
+        style.configure(
+            "Treeview.Heading", background=TOOLBAR_BG, foreground=FG, font=heading_font
+        )
         style.map(
             "Treeview",
             background=[("selected", SELECT_BG), ("!selected", PANEL_BG)],
             foreground=[("selected", "#ffffff"), ("!selected", FG)],
         )
-        # Ensure heading does not change on hover/active
         style.map(
             "Treeview.Heading",
             background=[("active", TOOLBAR_BG), ("!active", TOOLBAR_BG)],
             foreground=[("active", FG), ("!active", FG)],
         )
 
-        style.configure("TButton", background=TOOLBAR_BG, foreground=FG, font=button_font, padding=(6, 4))
+        style.configure(
+            "TButton",
+            background=TOOLBAR_BG,
+            foreground=FG,
+            font=button_font,
+            padding=(6, 4),
+        )
         style.map("TButton", background=[("active", "#3a3a3a")])
 
-        style.configure("TEntry", fieldbackground=PANEL_BG, foreground=FG, font=body_font)
+        style.configure(
+            "TEntry", fieldbackground=PANEL_BG, foreground=FG, font=body_font
+        )
         style.configure("TLabel", background=UI_BG, foreground=FG, font=body_font)
     except Exception:
-        # Ignore style configuration errors on unsupported platforms/themes
+        logger.debug("Failed to configure ttk styles", exc_info=True)
         pass
 
-    # PO# entry variable
     po_entry_var = tk.StringVar()
 
     current = {"quote": None}
@@ -262,33 +206,22 @@ def build_ui():
         current["quote"] = q
         update_tree()
         update_totals()
-        # update PO entry when loading a quote
         po_entry_var.set(q.get("po_number", ""))
-        # load notes into notes text area (if present)
-        try:
-            _load_notes_for_quote(q)
-        except Exception:
-            pass
+        _load_notes_for_quote(q)
 
     def clear_current():
         current["quote"] = None
         update_tree()
         update_totals()
         po_entry_var.set("")
-        try:
-            notes_text.delete("1.0", "end")
-        except Exception:
-            pass
+        notes_text.delete("1.0", "end")
 
     def new_quote():
         quoteTemplate = _new_quote_template()
         set_current_quote(quoteTemplate)
         po_entry_var.set("")
         # clear notes area
-        try:
-            notes_text.delete("1.0", "end")
-        except Exception:
-            pass
+        notes_text.delete("1.0", "end")
 
     def add_part():
         if current["quote"] is None:
@@ -504,9 +437,9 @@ def build_ui():
             logger.debug("Failed to read notes text: %s", e)
             # normalize quote name to 'ARC YYYY-MM-DD [PO:xxx]' when saving
             try:
-                q['name'] = format_quote_name(q)
+                q["name"] = format_quote_name(q)
             except Exception:
-                logger.debug('Failed to normalize quote name for id=%s', q.get('id'))
+                logger.debug("Failed to normalize quote name for id=%s", q.get("id"))
         # replace if exists
         existing = [x for x in quotes if x.get("id") == q.get("id")]
         if existing:
@@ -563,7 +496,9 @@ def build_ui():
                 return
             idx = int(sel[0])
             q = quotes[idx]
-            if not messagebox.askyesno("Delete Quote", f"Delete quote '{q.get('name')}'?"):
+            if not messagebox.askyesno(
+                "Delete Quote", f"Delete quote '{q.get('name')}'?"
+            ):
                 return
             # remove and save
             del quotes[idx]
@@ -583,8 +518,8 @@ def build_ui():
             # Suggest a safe filename based on standardized quote name
             suggested = _safe_filename(format_quote_name(q))
             fn = filedialog.asksaveasfilename(
-                defaultextension='.json',
-                filetypes=[('JSON files', '*.json'), ('All files', '*.*')],
+                defaultextension=".json",
+                filetypes=[("JSON files", "*.json"), ("All files", "*.*")],
                 initialfile=f"{suggested}.json",
             )
             if not fn:
@@ -594,7 +529,9 @@ def build_ui():
             messagebox.showinfo("Export Quote", f"Quote exported to {fn}")
 
         def _import():
-            fn = filedialog.askopenfilename(filetypes=[("JSON files", "*.json"), ("All files", "*.*")])
+            fn = filedialog.askopenfilename(
+                filetypes=[("JSON files", "*.json"), ("All files", "*.*")]
+            )
             if not fn:
                 return
             try:
@@ -605,21 +542,30 @@ def build_ui():
                 return
             # payload should be a dict representing a quote
             if not isinstance(payload, dict) or "items" not in payload:
-                messagebox.showerror("Import Quote", "File does not appear to be a valid quote JSON.")
+                messagebox.showerror(
+                    "Import Quote", "File does not appear to be a valid quote JSON."
+                )
                 return
             # avoid id collision: if same id exists, assign a new id
             existing_ids = {x.get("id") for x in quotes}
             if payload.get("id") in existing_ids:
-                payload["id"] = int(datetime.datetime.now(datetime.timezone.utc).timestamp())
+                payload["id"] = int(
+                    datetime.datetime.now(datetime.timezone.utc).timestamp()
+                )
             # normalize imported quote name to project format
             try:
                 payload["name"] = format_quote_name(payload)
             except Exception:
-                logger.debug("Failed to normalize imported quote name for id=%s", payload.get("id"))
+                logger.debug(
+                    "Failed to normalize imported quote name for id=%s",
+                    payload.get("id"),
+                )
             quotes.append(payload)
             save_quotes(quotes)
             lb.insert("end", _quote_label(payload))
-            messagebox.showinfo("Import Quote", f"Imported quote '{payload.get('name')}'")
+            messagebox.showinfo(
+                "Import Quote", f"Imported quote '{payload.get('name')}'"
+            )
 
         btn_frame = tk.Frame(load_quote_window)
         btn_frame.pack(fill="x", pady=6)
@@ -631,7 +577,9 @@ def build_ui():
         btn_exp.pack(side="left", padx=6)
         btn_imp = ttk.Button(btn_frame, text="Import", command=_import)
         btn_imp.pack(side="left", padx=6)
-        btn_close = ttk.Button(btn_frame, text="Close", command=load_quote_window.destroy)
+        btn_close = ttk.Button(
+            btn_frame, text="Close", command=load_quote_window.destroy
+        )
         btn_close.pack(side="right", padx=6)
 
     def export_pdf():
@@ -645,7 +593,7 @@ def build_ui():
         c = canvas.Canvas(path, pagesize=letter)
         y = 750
         c.setFont("Helvetica-Bold", 16)
-        c.drawString(72, y, "ARC-Works")
+        c.drawString(72, y, APP_NAME)
         y -= 25
         c.setFont("Helvetica-Bold", 14)
         c.drawString(72, y, q.get("name"))
@@ -653,45 +601,58 @@ def build_ui():
         # Page margins / left-right offset
         left = 72
         right = 72
-        po = q.get('po_number')
+        po = q.get("po_number")
         if po:
             c.setFont("Helvetica", 10)
             c.drawString(left, y, f"PO#: {po}")
             y -= 16
 
         available_width = letter[0] - left - right
-        col_widths = [0.6 * inch, 1.2 * inch, 3.2 * inch, 0.6 * inch, 0.9 * inch, 0.9 * inch]
+        col_widths = [
+            0.6 * inch,
+            1.2 * inch,
+            3.2 * inch,
+            0.6 * inch,
+            0.9 * inch,
+            0.9 * inch,
+        ]
         data = [["No", "Part", "Description", "Qty", "Unit", "Line"]]
         for idx, it in enumerate(q.get("items", []), start=1):
-            data.append([
-                str(idx),
-                it.get('part_number') or "",
-                it.get('description') or "",
-                str(it.get('quantity') or ""),
-                f"${(it.get('unit_cost') or 0.0):.2f}",
-                f"${(it.get('line_total') or 0.0):.2f}",
-            ])
+            data.append(
+                [
+                    str(idx),
+                    it.get("part_number") or "",
+                    it.get("description") or "",
+                    str(it.get("quantity") or ""),
+                    f"${(it.get('unit_cost') or 0.0):.2f}",
+                    f"${(it.get('line_total') or 0.0):.2f}",
+                ]
+            )
 
         total = sum(it.get("line_total", 0.0) for it in q.get("items", []))
         data.append(["", "", "", "", "Total", f"${total:.2f}"])
 
         table = Table(data, colWidths=col_widths)
         table.repeatRows = 1
-        table.setStyle(TableStyle([
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, 0), 9),
-            ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
-            ('ALIGN', (0, 0), (0, -1), 'CENTER'),
-            ('ALIGN', (3, 1), (5, -2), 'RIGHT'),
-            ('ALIGN', (4, -1), (5, -1), 'RIGHT'),
-            ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
-            ('GRID', (0, 0), (-1, -1), 0.25, colors.grey),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ('BOTTOMPADDING', (0, 0), (-1, 0), 6),
-            ('TOPPADDING', (0, 0), (-1, 0), 6),
-            ('LEFTPADDING', (0, 0), (-1, -1), 8),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 8),
-        ]))
+        table.setStyle(
+            TableStyle(
+                [
+                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                    ("FONTSIZE", (0, 0), (-1, 0), 9),
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.lightgrey),
+                    ("ALIGN", (0, 0), (0, -1), "CENTER"),
+                    ("ALIGN", (3, 1), (5, -2), "RIGHT"),
+                    ("ALIGN", (4, -1), (5, -1), "RIGHT"),
+                    ("FONTNAME", (0, -1), (-1, -1), "Helvetica-Bold"),
+                    ("GRID", (0, 0), (-1, -1), 0.25, colors.grey),
+                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                    ("BOTTOMPADDING", (0, 0), (-1, 0), 6),
+                    ("TOPPADDING", (0, 0), (-1, 0), 6),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 8),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+                ]
+            )
+        )
 
         # Draw the table and handle simple page overflow
         w, h = table.wrapOn(c, available_width, y)
@@ -699,12 +660,12 @@ def build_ui():
             c.showPage()
             y = 750
             c.setFont("Helvetica-Bold", 16)
-            c.drawString(left, y, "ARC-Works")
+            c.drawString(left, y, APP_NAME)
             y -= 25
             c.setFont("Helvetica-Bold", 14)
             c.drawString(left, y, q.get("name"))
             y -= 30
-            po = q.get('po_number')
+            po = q.get("po_number")
             if po:
                 c.setFont("Helvetica", 10)
                 c.drawString(left, y, f"PO#: {po}")
@@ -735,7 +696,9 @@ def build_ui():
                     _small_icon = None
         if _small_icon:
             root._small_icon = _small_icon
-            brand_lbl = tk.Label(toolbar, image=_small_icon, compound="left", bg=TOOLBAR_BG, fg=FG)
+            brand_lbl = tk.Label(
+                toolbar, image=_small_icon, compound="left", bg=TOOLBAR_BG, fg=FG
+            )
             brand_lbl.pack(side="left", padx=(6, 8), pady=6)
         else:
             # Pack a label anyway, gotta make it look consistent
@@ -764,7 +727,9 @@ def build_ui():
         platform_name_font_size = 10
         plat_name = "macOS" if platform.system() == "Darwin" else platform.system()
         small_font = tkfont.Font(family="Helvetica", size=platform_name_font_size)
-        plat_lbl = tk.Label(toolbar, text=plat_name, bg=TOOLBAR_BG, fg=FG, font=small_font)
+        plat_lbl = tk.Label(
+            toolbar, text=plat_name, bg=TOOLBAR_BG, fg=FG, font=small_font
+        )
         plat_lbl.pack(side="right", padx=(0, 6))
     except Exception:
         pass
@@ -775,7 +740,9 @@ def build_ui():
     def _exit_app(event=None):
         q = current.get("quote")
         if q:
-            ans = messagebox.askyesnocancel("Exit", "Save current quote before exiting?")
+            ans = messagebox.askyesnocancel(
+                "Exit", "Save current quote before exiting?"
+            )
             if ans is None:
                 return
             if ans:
@@ -799,7 +766,15 @@ def build_ui():
     cols = ("part", "desc", "qty", "unit", "list", "source", "line")
     tree = ttk.Treeview(content, columns=cols, show="headings")
     tree.place(relx=0.02, rely=0.12, relwidth=0.96, relheight=0.60)
-    headings = ["Part #", "Description", "Qty", "Unit Cost", "List Price", "Source", "Line Total"]
+    headings = [
+        "Part #",
+        "Description",
+        "Qty",
+        "Unit Cost",
+        "List Price",
+        "Source",
+        "Line Total",
+    ]
     for c, h in zip(cols, headings):
         tree.heading(c, text=h)
 
@@ -823,7 +798,6 @@ def build_ui():
     tree.tag_configure("selected", background=SELECT_BG, foreground="#ffffff")
 
     def refresh_tags(event=None):
-        # Ensure selected item(s) have 'selected' tag and others keep their odd/even tag
         sel = set(tree.selection())
         for idx, iid in enumerate(tree.get_children()):
             if iid in sel:
@@ -832,16 +806,16 @@ def build_ui():
                 tag = "row_even" if (idx % 2 == 0) else "row_odd"
                 tree.item(iid, tags=(tag,))
 
-    # Bind selection changes to refresh tags; also refresh on enter/leave to keep backgrounds consistent
     tree.bind("<<TreeviewSelect>>", refresh_tags)
     tree.bind("<Enter>", refresh_tags)
     tree.bind("<Leave>", refresh_tags)
 
+    # Total Label
     lbl_total = tk.Label(content, text="Total: $0.00", bg=bg_color)
     lbl_total.place(relx=0.02, rely=0.75)
     lbl_total.configure(font=button_font, foreground=FG)
 
-    # Notes area (dark background, visible border, modern font)
+    #Notes area
     notes_frame = tk.Frame(content, bg=PANEL_BG, bd=0)
     notes_frame.place(relx=0.02, rely=0.78, relwidth=0.96, relheight=0.20)
     notes_label = ttk.Label(notes_frame, text="Notes:")
@@ -880,7 +854,9 @@ def build_ui():
     quotes = load_quotes()
     if quotes:
         # pick the most recently created (by created_at)
-        quotes_sorted = sorted(quotes, key=lambda x: x.get("created_at") or "", reverse=True)
+        quotes_sorted = sorted(
+            quotes, key=lambda x: x.get("created_at") or "", reverse=True
+        )
         set_current_quote(quotes_sorted[0])
 
     return root

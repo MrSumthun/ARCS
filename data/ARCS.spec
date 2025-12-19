@@ -5,6 +5,7 @@ import os
 # It allows running `pyinstaller data/ARCS.spec` from the repository root.
 # Note: When PyInstaller executes a spec, `__file__` may not be defined; fall back to
 # using the repo cwd + 'data' directory so the spec still resolves resources.
+
 if '__file__' in globals():
     here = os.path.abspath(os.path.dirname(__file__))
 else:
@@ -23,7 +24,7 @@ a = Analysis(
     pathex=[project_root],
     binaries=[],
     datas=datas,
-    hiddenimports=[],
+    hiddenimports=['arcs_utils'],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

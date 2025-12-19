@@ -4,7 +4,7 @@
 
 Lightweight RFQ/quoting app built with Tkinter. Add parts, set PO#, save/load quotes as JSON, and export printable PDFs.
 
-Quick start 🚀
+Quick start
 
 End user (recommended)
 
@@ -21,7 +21,7 @@ Developer / contributor (optional)
 2. pip3 install -r requirements.txt
 3. (Dev only) Run: `python3 arcs.py`
 
-Core features ✨
+Core features
 
 - Add/edit/delete parts (part #, description, qty, unit cost, list price, source)
 - Save/load quotes to `data/quotes.json` (user data stored in `~/.arcsoftware/quotes.json` when packaged)
@@ -37,9 +37,9 @@ Use the included helper scripts to build distributables:
 
 If you prefer to run PyInstaller manually, consult the PyInstaller docs — the helper scripts show a recommended configuration.
 
-Developer notes 🔧
+Developer notes
 
-- Main module: `arcs.py` (replaced `arcsoftware.py`). Build scripts and spec updated.
-- Use `resource_path()` in the code to locate bundled resources under PyInstaller (`sys._MEIPASS`).
-- Linting: repo uses `flake8` (max line length 120). Auto-formatting with `black` is used.
-- Use purchase_list.py for CLI based PO ordering
+- Main module: `arcs.py`.
+- Use `get_resource_path()` from `arcs_utils` to locate bundled resources under PyInstaller (`sys._MEIPASS`).
+- Linting: repo uses `flake8` (max line length 120). Auto-formatting with `black` is recommended.
+- Use `purchase_list.py` for CLI-based purchase lists.
