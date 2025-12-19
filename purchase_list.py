@@ -1,14 +1,12 @@
-# purchase_list.py - generate a purchase list from saved quotes
-## flags --aggregate: legacy behavior, aggregate all parts across all quotes
-##       --json: output JSON instead of text table
-
+# purchase_list.py
+# Generate a purchase parts list from saved quotes.
+# --aggregate: legacy behavior, aggregate all parts across all quotes
+# --json: output JSON instead of text table
 from __future__ import annotations
 
 import argparse
 import json
 import os
-import sys
-from collections import defaultdict
 from typing import Dict, Any, List
 
 # Try to reuse arcs' load path when possible without importing the whole UI
@@ -89,7 +87,15 @@ def print_table(rows):
     print(fmt.format(*cols))
     print("-" * (sum(widths) + 2 * (len(widths) - 1)))
     for r in rows:
-        print(fmt.format(r["part_number"], r["quantity"], r["source"], f"{r['unit_cost']:.2f}", f"{r['list_price']:.2f}"))
+        print(
+            fmt.format(
+                r["part_number"],
+                r["quantity"],
+                r["source"],
+                f"{r['unit_cost']:.2f}",
+                f"{r['list_price']:.2f}",
+            )
+        )
 
 
 def print_per_quote(quotes: List[Dict[str, Any]]):
@@ -98,7 +104,7 @@ def print_per_quote(quotes: List[Dict[str, Any]]):
         print("No quotes to show.")
         return
     for i, q in enumerate(quotes, start=1):
-        name = q.get("name") or f"Quote {i} (id: {q.get('id','?')})"
+        name = q.get("name") or f"Quote {i} (id: {q.get('id', '?')})"
         items = q.get("items") or []
         if not items:
             print(f"\n{name}: (no items)")
