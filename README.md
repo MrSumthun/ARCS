@@ -43,5 +43,3 @@ Developer notes 🔧
 - Use `resource_path()` in the code to locate bundled resources under PyInstaller (`sys._MEIPASS`).
 - Linting: repo uses `flake8` (max line length 120). Auto-formatting with `black` is used.
 - Use purchase_list.py for CLI based PO ordering
-
-

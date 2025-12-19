@@ -641,6 +641,9 @@ def build_ui():
         try:
             from reportlab.lib.pagesizes import letter
             from reportlab.pdfgen import canvas
+            from reportlab.platypus import Table, TableStyle
+            from reportlab.lib import colors
+            from reportlab.lib.units import inch
         except Exception:
             # fallback: write HTML and open in browser for printing to PDF
             html = ['<html><head><meta charset="utf-8"><title>Quote</title></head><body>']
@@ -693,23 +696,78 @@ def build_ui():
         c.setFont("Helvetica-Bold", 14)
         c.drawString(72, y, q.get("name"))
         y -= 30
-        c.setFont("Helvetica", 9)
-        # Table header
-        for it in q.get("items", []):
-            line = (
-                f"{it.get('part_number')} | {it.get('description')} | "
-                f"{it.get('quantity')} x {(it.get('unit_cost') or 0.0):.2f} = {(it.get('line_total') or 0.0):.2f}"
-            )
-            c.drawString(72, y, line)
-            y -= 14
-            if y < 72:
-                c.showPage()
-                y = 750
+        # Page margins / left-right offset
+        left = 72
+        right = 72
+        # Add PO# under the quote name (if present)
+        po = q.get('po_number')
+        if po:
+            c.setFont("Helvetica", 10)
+            c.drawString(left, y, f"PO#: {po}")
+            y -= 16
+
+        # Build a formal table using ReportLab platypus Table for aligned columns and totals
+        available_width = letter[0] - left - right
+        # Column widths (in inches) chosen to fit the printable area. Increased first column for more spacing.
+        col_widths = [0.6 * inch, 1.2 * inch, 3.2 * inch, 0.6 * inch, 0.9 * inch, 0.9 * inch]
+
+        # Prepare table data with header
+        data = [["No", "Part", "Description", "Qty", "Unit", "Line"]]
+        for idx, it in enumerate(q.get("items", []), start=1):
+            data.append([
+                str(idx),
+                it.get('part_number') or "",
+                it.get('description') or "",
+                str(it.get('quantity') or ""),
+                f"${(it.get('unit_cost') or 0.0):.2f}",
+                f"${(it.get('line_total') or 0.0):.2f}",
+            ])
 
         total = sum(it.get("line_total", 0.0) for it in q.get("items", []))
-        y -= 10
-        c.setFont("Helvetica-Bold", 12)
-        c.drawString(72, y, f"Total: ${total:.2f}")
+        # Add a totals row
+        data.append(["", "", "", "", "Total", f"${total:.2f}"])
+
+        table = Table(data, colWidths=col_widths)
+        # Repeat the header row if table splits across pages
+        table.repeatRows = 1
+        table.setStyle(TableStyle([
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 9),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+            ('ALIGN', (0, 0), (0, -1), 'CENTER'),
+            ('ALIGN', (3, 1), (5, -2), 'RIGHT'),
+            ('ALIGN', (4, -1), (5, -1), 'RIGHT'),
+            ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+            ('GRID', (0, 0), (-1, -1), 0.25, colors.grey),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 6),
+            ('TOPPADDING', (0, 0), (-1, 0), 6),
+            ('LEFTPADDING', (0, 0), (-1, -1), 8),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 8),
+        ]))
+
+        # Draw the table and handle simple page overflow
+        w, h = table.wrapOn(c, available_width, y)
+        if h > (y - 72):
+            c.showPage()
+            # Redraw the document header on the new page
+            y = 750
+            c.setFont("Helvetica-Bold", 16)
+            c.drawString(left, y, "ARC-Works")
+            y -= 25
+            c.setFont("Helvetica-Bold", 14)
+            c.drawString(left, y, q.get("name"))
+            y -= 30
+            # Re-draw PO# on new page as well
+            po = q.get('po_number')
+            if po:
+                c.setFont("Helvetica", 10)
+                c.drawString(left, y, f"PO#: {po}")
+                y -= 16
+            w, h = table.wrapOn(c, available_width, y)
+
+        table.drawOn(c, left, y - h)
+        y = y - h - 12
         c.save()
         webbrowser.open("file://" + path)
 
