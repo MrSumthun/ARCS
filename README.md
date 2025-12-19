@@ -1,6 +1,6 @@
 # ARCS
 
-[![Python](https://img.shields.io/badge/Python-3.8%2B-blue)](https://www.python.org/) [![Platform](https://img.shields.io/badge/Platform-macOS%20%7C%20Windows-brightgreen)]() [![Version](https://img.shields.io/badge/Version-1.0.2-purple)]() [![Status](https://img.shields.io/badge/Status-Beta-yellow)]() [![UI](https://img.shields.io/badge/UI-Tkinter-orange)]()
+[![Python](https://img.shields.io/badge/Python-3.8%2B-blue)](https://www.python.org/) [![Platform](https://img.shields.io/badge/Platform-macOS%20%7C%20Windows-brightgreen)]() [![Version](https://img.shields.io/badge/Version-1.0.3-purple)]() [![Status](https://img.shields.io/badge/Status-Beta-yellow)]() [![UI](https://img.shields.io/badge/UI-Tkinter-orange)]()
 
 Lightweight RFQ/quoting app built with Tkinter. Add parts, set PO#, save/load quotes as JSON, and export printable PDFs.
 
