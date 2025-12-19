@@ -382,10 +382,10 @@ def build_ui():
                     it.get("part_number"),
                     it.get("description"),
                     it.get("quantity"),
-                    f"{it.get('unit_cost'):.2f}",
-                    f"{it.get('list_price'):.2f}",
+                    f"{(it.get('unit_cost') or 0.0):.2f}",
+                    f"{(it.get('list_price') or 0.0):.2f}",
                     it.get("source"),
-                    f"{it.get('line_total'):.2f}",
+                    f"{(it.get('line_total') or 0.0):.2f}",
                 ),
             )
         # Refresh tags so selection and odd/even backgrounds are applied
@@ -665,10 +665,10 @@ def build_ui():
                     f"<td>{it.get('part_number')}</td>"
                     f"<td>{it.get('description')}</td>"
                     f"<td>{it.get('quantity')}</td>"
-                    f"<td>{it.get('unit_cost'):.2f}</td>"
-                    f"<td>{it.get('list_price'):.2f}</td>"
+                    f"<td>{(it.get('unit_cost') or 0.0):.2f}</td>"
+                    f"<td>{(it.get('list_price') or 0.0):.2f}</td>"
                     f"<td>{it.get('source')}</td>"
-                    f"<td>{it.get('line_total'):.2f}</td>"
+                    f"<td>{(it.get('line_total') or 0.0):.2f}</td>"
                     "</tr>"
                 )
                 html.append(row)
@@ -698,7 +698,7 @@ def build_ui():
         for it in q.get("items", []):
             line = (
                 f"{it.get('part_number')} | {it.get('description')} | "
-                f"{it.get('quantity')} x {it.get('unit_cost'):.2f} = {it.get('line_total'):.2f}"
+                f"{it.get('quantity')} x {(it.get('unit_cost') or 0.0):.2f} = {(it.get('line_total') or 0.0):.2f}"
             )
             c.drawString(72, y, line)
             y -= 14
