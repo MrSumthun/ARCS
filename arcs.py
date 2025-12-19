@@ -57,6 +57,7 @@ if not logger.handlers:
     fh.setFormatter(fmt)
     logger.addHandler(fh)
 
+
 def load_quotes():
     try:
         data = load_json_file(QUOTES_FILE)
@@ -89,6 +90,7 @@ def format_quote_name(q):
 
 def _safe_filename(name):
     return safe_filename(name)
+
 
 # Center the window on the screen
 def _center_window(root, width=DEFAULT_WIDTH, height=DEFAULT_HEIGHT):
@@ -131,7 +133,9 @@ def build_ui():
                         root._icon_img = imgtk
                     except Exception:
                         # ignore if neither method works; leaving default Tk icon
-                        logger.debug("Failed to set iconphoto for %s", APP_ICON, exc_info=True)
+                        logger.debug(
+                            "Failed to set iconphoto for %s", APP_ICON, exc_info=True
+                        )
                         pass
     except Exception:
         # ignore platforms that don't support icon changes or if setting fails
@@ -815,7 +819,7 @@ def build_ui():
     lbl_total.place(relx=0.02, rely=0.75)
     lbl_total.configure(font=button_font, foreground=FG)
 
-    #Notes area
+    # Notes area
     notes_frame = tk.Frame(content, bg=PANEL_BG, bd=0)
     notes_frame.place(relx=0.02, rely=0.78, relwidth=0.96, relheight=0.20)
     notes_label = ttk.Label(notes_frame, text="Notes:")

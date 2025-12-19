@@ -4,7 +4,9 @@ import importlib.util
 
 def _load_utils():
     """Dynamically load the local `arcs_utils` module by path for tests."""
-    path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "arcs_utils.py"))
+    path = os.path.abspath(
+        os.path.join(os.path.dirname(__file__), "..", "arcs_utils.py")
+    )
     spec = importlib.util.spec_from_file_location("arcs_utils", path)
     module = importlib.util.module_from_spec(spec)
     assert spec and spec.loader

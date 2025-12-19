@@ -1,5 +1,5 @@
-import json
 import os
+import sys
 import importlib.util
 
 
@@ -14,7 +14,6 @@ def _load_module_by_path(name: str, rel_path: str):
 
 utils = _load_module_by_path("arcs_utils", "arcs_utils.py")
 # Ensure the import inside `arcs.py` can resolve `arcs_utils` by placing it into sys.modules
-import sys
 sys.modules["arcs_utils"] = utils
 arcs = _load_module_by_path("arcs", "arcs.py")
 
