@@ -25,7 +25,7 @@ from arcs_utils import (
 # Le constants
 # Mr_SuMtHuN 2025
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
-VERSION = "1.0.4-beta"
+VERSION = "v1.0.4-beta"
 APP_NAME = "ARCS"
 APP_TITLE = "ARCS Quote Manager"
 
@@ -92,7 +92,15 @@ class AddEditPartDialog(QtWidgets.QDialog):
         layout = QtWidgets.QFormLayout(self)
 
         self.part_edit = QtWidgets.QLineEdit()
+        self.part_edit.setMinimumWidth(280)
+        self.part_edit.setSizePolicy(
+            QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Fixed
+        )
         self.desc_edit = QtWidgets.QLineEdit()
+        self.desc_edit.setMinimumWidth(420)
+        self.desc_edit.setSizePolicy(
+            QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Fixed
+        )
         self.qty_spin = QtWidgets.QSpinBox()
         self.qty_spin.setMinimum(1)
         self.qty_spin.setMaximum(10_000_000)
@@ -365,13 +373,9 @@ class ArcsWindow(QtWidgets.QMainWindow):
         )
         self.toolbar.addWidget(spacer)
         self.toolbar.addWidget(ver_lbl)
-
-        # PO# entry
         self.po_edit = QtWidgets.QLineEdit()
         self.po_edit.setPlaceholderText("PO#")
         self.toolbar.addWidget(self.po_edit)
-
-        # Table
         self.table = QtWidgets.QTableWidget(0, 7)
         self.table.setHorizontalHeaderLabels(
             [
@@ -698,6 +702,8 @@ def main():
     pal.setColor(QtGui.QPalette.ColorRole.HighlightedText, QtGui.QColor("#ffffff"))
     app.setPalette(pal)
 
+    app.setApplicationName(APP_NAME)
+    app.setApplicationDisplayName(APP_TITLE)
     win = ArcsWindow()
     win.show()
     app.exec()
