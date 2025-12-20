@@ -4,7 +4,7 @@
 
 Lightweight RFQ/quoting app built with PyQt6. Add parts, set PO#, save/load quotes as JSON, and export printable PDFs.
 
-Quick start
+## Quick start
 
 End user (recommended)
 
@@ -34,4 +34,3 @@ Developer notes
 - Use `get_resource_path()` from `arcs_utils` to locate bundled resources under PyInstaller (`sys._MEIPASS`).
 - Linting: repo uses `flake8` (max line length 120). Auto-formatting with `black` is recommended.
 - Use `purchase_list.py` for CLI-based purchase lists.
-- Use `arcs_TK` available for older Tkinter version compatibility
