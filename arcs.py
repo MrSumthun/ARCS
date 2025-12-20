@@ -4,10 +4,8 @@ import tempfile
 import datetime
 import webbrowser
 import logging
-import tkinter as tk
-import platform
-from tkinter import ttk, messagebox, filedialog
-import tkinter.font as tkfont
+
+from PyQt6 import QtCore, QtGui, QtWidgets
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 from reportlab.platypus import Table, TableStyle
@@ -25,21 +23,25 @@ from arcs_utils import (
 )
 
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
-VERSION = "1.0.3-beta"
+VERSION = "1.0.4-beta"
 APP_NAME = "ARCS"
 APP_TITLE = "ARCS Quote Manager"
-DEFAULT_WIDTH = 1000
-DEFAULT_HEIGHT = 700
-UI_BG = "#1f1f1f"  # main window background
-TOOLBAR_BG = "#2a2a2a"  # toolbar background
-PANEL_BG = "#141414"  # panels / tree background
-FG = "#e8e8e8"  # primary foreground (text)
-SELECT_BG = "#2b6fb6"  # selection color for rows
+
+UI_BG = "#0b1220"
+TOOLBAR_BG = "#B22234"
+PANEL_BG = "#000000"
+ALT_PANEL_BG = "#12233a"
+FG = "#ffffff"
+ACCENT = "#B22234"
+ACCENT2 = "#ffffff"
+ACCENT3 = "#ffffff"
+
 BUNDLED_QUOTES_FILE = get_resource_path(os.path.join("data", "quotes.json"))
 APP_ICON = get_resource_path(os.path.join("data", "app.ico"))
 QUOTES_FILE = os.path.join(user_data_dir(), "quotes.json")
 LOG_FILE = os.path.join(user_data_dir(), "arcsoftware.log")
 logger = logging.getLogger("arcsoftware")
+
 
 if not logger.handlers:
     logger.setLevel(logging.DEBUG)
@@ -64,6 +66,33 @@ def load_quotes():
     return data or []
 
 
+def load_pixmap(path: str) -> "QtGui.QPixmap | None":
+    if not path or not os.path.exists(path):
+        return None
+
+    pix = QtGui.QPixmap(path)
+    if not pix.isNull():
+        return pix
+
+    try:
+        from PIL import Image
+        import io
+
+        img = Image.open(path)
+        if img.mode not in ("RGBA", "RGB"):
+            img = img.convert("RGBA")
+        buf = io.BytesIO()
+        img.save(buf, format="PNG")
+        data = buf.getvalue()
+        pix2 = QtGui.QPixmap()
+        if pix2.loadFromData(data, "PNG"):
+            return pix2
+    except Exception:
+        logger.debug("PIL fallback failed for icon: %s", path, exc_info=True)
+
+    return None
+
+
 def save_quotes(quotes):
     try:
         save_json_file(QUOTES_FILE, quotes)
@@ -72,350 +101,470 @@ def save_quotes(quotes):
         logger.exception("Failed to save quotes to %s", QUOTES_FILE)
 
 
-def _new_quote_template(name=None):
-    return create_quote(name)
+class AddEditPartDialog(QtWidgets.QDialog):
+    def __init__(self, parent=None, item=None):
+        super().__init__(parent)
+        self.setWindowTitle("Add Part" if item is None else "Edit Part")
+        self.setModal(True)
+        layout = QtWidgets.QFormLayout(self)
 
+        self.part_edit = QtWidgets.QLineEdit()
+        self.desc_edit = QtWidgets.QLineEdit()
+        self.qty_spin = QtWidgets.QSpinBox()
+        self.qty_spin.setMinimum(1)
+        self.qty_spin.setMaximum(10_000_000)
+        self.unit_spin = QtWidgets.QDoubleSpinBox()
+        self.unit_spin.setMaximum(10_000_000.0)
+        self.unit_spin.setDecimals(2)
+        self.list_spin = QtWidgets.QDoubleSpinBox()
+        self.list_spin.setMaximum(10_000_000.0)
+        self.list_spin.setDecimals(2)
+        self.source_edit = QtWidgets.QLineEdit()
 
-def format_quote_name(q):
-    return normalize_quote_name(q)
+        layout.addRow("Part #", self.part_edit)
+        layout.addRow("Description", self.desc_edit)
+        layout.addRow("Qty", self.qty_spin)
+        layout.addRow("Unit Cost", self.unit_spin)
+        layout.addRow("List Price", self.list_spin)
+        layout.addRow("Source", self.source_edit)
 
-
-def _safe_filename(name):
-    return safe_filename(name)
-
-
-def _center_window(root, width=DEFAULT_WIDTH, height=DEFAULT_HEIGHT):
-    screen_w = root.winfo_screenwidth()
-    screen_h = root.winfo_screenheight()
-    x = int((screen_w - width) / 2)
-    y = int((screen_h - height) / 2)
-    root.geometry(f"{width}x{height}+{x}+{y}")
-
-
-def build_ui():
-    root = tk.Tk()
-    root.title(APP_TITLE)
-    bg_color = UI_BG
-    root.configure(bg=bg_color)
-    root.minsize(900, 600)
-    _center_window(root, DEFAULT_WIDTH, DEFAULT_HEIGHT)
-    if APP_ICON and os.path.exists(APP_ICON):
-        tried = False
-        try:
-            root.iconbitmap(APP_ICON)
-            tried = True
-        except Exception:
-            logger.debug("iconbitmap failed for %s", APP_ICON)
-            pass
-        if not tried or platform.system() != "Windows":
-            try:
-                _img = tk.PhotoImage(file=APP_ICON)
-                root.iconphoto(True, _img)
-                root._icon_img = _img
-            except Exception:
-                from PIL import Image, ImageTk
-
-                img = Image.open(APP_ICON)
-                imgtk = ImageTk.PhotoImage(img)
-                root.iconphoto(True, imgtk)
-                root._icon_img = imgtk
-
-    # Main content area
-    content = tk.Frame(root, bg=bg_color)
-    content.place(relx=0, rely=0, relwidth=1, relheight=1)
-    toolbar = tk.Frame(content, bg=TOOLBAR_BG)
-    toolbar.place(relx=0.02, rely=0.02, relwidth=0.96, relheight=0.10)
-    style = ttk.Style(root)
-
-    if platform.system() == "Windows":
-        base_family = "Segoe UI"
-    else:
-        base_family = "Helvetica"
-
-    body_font = tkfont.Font(family=base_family, size=11)
-    heading_font = tkfont.Font(family=base_family, size=11, weight="bold")
-    button_font = tkfont.Font(family=base_family, size=10)
-    style.theme_use("clam")
-    try:
-        style.configure(
-            "Treeview",
-            background=PANEL_BG,
-            fieldbackground=PANEL_BG,
-            foreground=FG,
-            rowheight=26,
-            font=body_font,
+        btn_box = QtWidgets.QDialogButtonBox(
+            QtWidgets.QDialogButtonBox.StandardButton.Ok
+            | QtWidgets.QDialogButtonBox.StandardButton.Cancel
         )
-        style.configure(
-            "Treeview.Heading", background=TOOLBAR_BG, foreground=FG, font=heading_font
-        )
-        style.map(
-            "Treeview",
-            background=[("selected", SELECT_BG), ("!selected", PANEL_BG)],
-            foreground=[("selected", "#ffffff"), ("!selected", FG)],
-        )
-        style.map(
-            "Treeview.Heading",
-            background=[("active", TOOLBAR_BG), ("!active", TOOLBAR_BG)],
-            foreground=[("active", FG), ("!active", FG)],
-        )
+        btn_box.accepted.connect(self.accept)
+        btn_box.rejected.connect(self.reject)
+        layout.addRow(btn_box)
 
-        style.configure(
-            "TButton",
-            background=TOOLBAR_BG,
-            foreground=FG,
-            font=button_font,
-            padding=(6, 4),
-        )
-        style.map("TButton", background=[("active", "#3a3a3a")])
+        if item:
+            self.part_edit.setText(item.get("part_number", ""))
+            self.desc_edit.setText(item.get("description", ""))
+            self.qty_spin.setValue(int(item.get("quantity", 1)))
+            self.unit_spin.setValue(float(item.get("unit_cost", 0.0)))
+            self.list_spin.setValue(float(item.get("list_price", 0.0)))
+            self.source_edit.setText(item.get("source", ""))
 
-        style.configure(
-            "TEntry", fieldbackground=PANEL_BG, foreground=FG, font=body_font
-        )
-        style.configure("TLabel", background=UI_BG, foreground=FG, font=body_font)
-    except Exception:
-        logger.debug("Failed to configure ttk styles", exc_info=True)
-        pass
+    def get_data(self):
+        return {
+            "part_number": self.part_edit.text().strip(),
+            "description": self.desc_edit.text().strip(),
+            "quantity": int(self.qty_spin.value()),
+            "unit_cost": float(self.unit_spin.value()),
+            "list_price": float(self.list_spin.value()),
+            "source": self.source_edit.text().strip(),
+            "line_total": round(
+                int(self.qty_spin.value()) * float(self.unit_spin.value()), 2
+            ),
+        }
 
-    po_entry_var = tk.StringVar()
 
-    current = {"quote": None}
+class LoadQuoteDialog(QtWidgets.QDialog):
+    def __init__(self, parent=None, quotes=None):
+        super().__init__(parent)
+        self.setWindowTitle("Load Quote")
+        self.setModal(True)
+        self.selected = None
+        self.quotes = quotes or []
+        layout = QtWidgets.QVBoxLayout(self)
 
-    def set_current_quote(q):
-        current["quote"] = q
-        update_tree()
-        update_totals()
-        po_entry_var.set(q.get("po_number", ""))
-        _load_notes_for_quote(q)
+        self.list_widget = QtWidgets.QListWidget()
+        for q in self.quotes:
+            po = q.get("po_number")
+            po_str = f" [PO:{po}]" if po else ""
+            label = f"{q.get('name')}{po_str} ({len(q.get('items', []))} items)"
+            item = QtWidgets.QListWidgetItem(label)
+            self.list_widget.addItem(item)
+        layout.addWidget(self.list_widget)
 
-    def clear_current():
-        current["quote"] = None
-        update_tree()
-        update_totals()
-        po_entry_var.set("")
-        notes_text.delete("1.0", "end")
+        btn_layout = QtWidgets.QHBoxLayout()
+        self.load_btn = QtWidgets.QPushButton("Load")
+        self.del_btn = QtWidgets.QPushButton("Delete")
+        self.exp_btn = QtWidgets.QPushButton("Export")
+        self.imp_btn = QtWidgets.QPushButton("Import")
+        btn_layout.addWidget(self.load_btn)
+        btn_layout.addWidget(self.del_btn)
+        btn_layout.addWidget(self.exp_btn)
+        btn_layout.addWidget(self.imp_btn)
+        btn_layout.addStretch()
+        self.close_btn = QtWidgets.QPushButton("Close")
+        btn_layout.addWidget(self.close_btn)
+        layout.addLayout(btn_layout)
 
-    def new_quote():
-        quoteTemplate = _new_quote_template()
-        set_current_quote(quoteTemplate)
-        po_entry_var.set("")
-        # clear notes area
-        notes_text.delete("1.0", "end")
+        self.load_btn.clicked.connect(self._load)
+        self.del_btn.clicked.connect(self._delete)
+        self.exp_btn.clicked.connect(self._export)
+        self.imp_btn.clicked.connect(self._import)
+        self.close_btn.clicked.connect(self.close)
 
-    def add_part():
-        if current["quote"] is None:
-            new_quote()
-
-        def _submit():
-            pn = ent_part.get().strip()
-            desc = ent_desc.get().strip()
-            try:
-                qty = int(ent_qty.get())
-            except ValueError:
-                qty = 1
-            try:
-                unit = float(ent_unit.get())
-            except ValueError:
-                unit = 0.0
-            try:
-                listp = float(ent_list.get())
-            except ValueError:
-                listp = 0.0
-            src = ent_source.get().strip()
-
-            item = {
-                "part_number": pn,
-                "description": desc,
-                "quantity": qty,
-                "unit_cost": unit,
-                "list_price": listp,
-                "source": src,
-                "line_total": round(qty * unit, 2),
-            }
-            current["quote"]["items"].append(item)
-            update_tree()
-            update_totals()
-            add_part_window.destroy()
-
-        add_part_window = tk.Toplevel(root)
-        add_part_window.title("Add Part")
-        add_part_window.transient(root)
-        add_part_window.grab_set()
-
-        lbl_part = ttk.Label(add_part_window, text="Part #")
-        lbl_part.grid(row=0, column=0, sticky="e")
-        ent_part = ttk.Entry(add_part_window)
-        ent_part.grid(row=0, column=1, sticky="we")
-
-        lbl_desc = ttk.Label(add_part_window, text="Description")
-        lbl_desc.grid(row=1, column=0, sticky="e")
-        ent_desc = ttk.Entry(add_part_window)
-        ent_desc.grid(row=1, column=1, sticky="we")
-
-        lbl_qty = ttk.Label(add_part_window, text="Qty")
-        lbl_qty.grid(row=2, column=0, sticky="e")
-        ent_qty = ttk.Entry(add_part_window)
-        ent_qty.insert(0, "1")
-        ent_qty.grid(row=2, column=1, sticky="we")
-
-        lbl_unit = ttk.Label(add_part_window, text="Unit Cost")
-        lbl_unit.grid(row=3, column=0, sticky="e")
-        ent_unit = ttk.Entry(add_part_window)
-        ent_unit.insert(0, "0.00")
-        ent_unit.grid(row=3, column=1, sticky="we")
-
-        lbl_list = ttk.Label(add_part_window, text="List Price")
-        lbl_list.grid(row=4, column=0, sticky="e")
-        ent_list = ttk.Entry(add_part_window)
-        ent_list.insert(0, "0.00")
-        ent_list.grid(row=4, column=1, sticky="we")
-
-        lbl_source = ttk.Label(add_part_window, text="Source")
-        lbl_source.grid(row=5, column=0, sticky="e")
-        ent_source = ttk.Entry(add_part_window)
-        ent_source.grid(row=5, column=1, sticky="we")
-
-        btn = ttk.Button(add_part_window, text="Add", command=_submit)
-        btn.grid(row=6, column=0, columnspan=2, pady=(8, 4))
-
-        add_part_window.columnconfigure(1, weight=1)
-
-    def update_tree():
-        for r in tree.get_children():
-            tree.delete(r)
-        q = current.get("quote")
-        if not q:
+    def _load(self):
+        sel = self.list_widget.currentRow()
+        if sel < 0:
             return
-        for idx, it in enumerate(q["items"], start=1):
-            tree.insert(
-                "",
-                "end",
-                iid=str(idx - 1),
-                values=(
-                    it.get("part_number"),
-                    it.get("description"),
-                    it.get("quantity"),
-                    f"{(it.get('unit_cost') or 0.0):.2f}",
-                    f"{(it.get('list_price') or 0.0):.2f}",
-                    it.get("source"),
-                    f"{(it.get('line_total') or 0.0):.2f}",
-                ),
+        self.selected = self.quotes[sel]
+        self.accept()
+
+    def _delete(self):
+        sel = self.list_widget.currentRow()
+        if sel < 0:
+            QtWidgets.QMessageBox.information(
+                self, "Delete Quote", "No quote selected."
             )
-        # Refresh tags so selection and odd/even backgrounds are applied
-        refresh_tags()
+            return
+        q = self.quotes[sel]
+        if not QtWidgets.QMessageBox.question(
+            self, "Delete Quote", f"Delete quote '{q.get('name')}'?"
+        ):
+            return
+        del self.quotes[sel]
+        try:
+            save_quotes(self.quotes)
+            self.list_widget.takeItem(sel)
+        except Exception as e:
+            QtWidgets.QMessageBox.critical(
+                self, "Delete Quote", f"Failed to delete quote: {e}"
+            )
 
-    def update_totals():
-        q = current.get("quote")
+    def _export(self):
+        sel = self.list_widget.currentRow()
+        if sel < 0:
+            QtWidgets.QMessageBox.information(
+                self, "Export Quote", "No quote selected."
+            )
+            return
+        q = self.quotes[sel]
+        suggested = safe_filename(normalize_quote_name(q))
+        fn, _ = QtWidgets.QFileDialog.getSaveFileName(
+            self,
+            "Export Quote",
+            f"{suggested}.json",
+            "JSON files (*.json);;All Files (*)",
+        )
+        if not fn:
+            return
+        try:
+            with open(fn, "w") as f:
+                json.dump(q, f, indent=4, default=str)
+            QtWidgets.QMessageBox.information(
+                self, "Export Quote", f"Quote exported to {fn}"
+            )
+        except Exception as e:
+            QtWidgets.QMessageBox.critical(
+                self, "Export Quote", f"Failed to export: {e}"
+            )
+
+    def _import(self):
+        fn, _ = QtWidgets.QFileDialog.getOpenFileName(
+            self, "Import Quote", "", "JSON files (*.json);;All Files (*)"
+        )
+        if not fn:
+            return
+        try:
+            with open(fn, "r") as f:
+                payload = json.load(f)
+        except Exception as e:
+            QtWidgets.QMessageBox.critical(
+                self, "Import Quote", f"Failed to read file: {e}"
+            )
+            return
+        if not isinstance(payload, dict) or "items" not in payload:
+            QtWidgets.QMessageBox.critical(
+                self, "Import Quote", "File does not appear to be a valid quote JSON."
+            )
+            return
+        existing_ids = {x.get("id") for x in self.quotes}
+        if payload.get("id") in existing_ids:
+            payload["id"] = int(
+                datetime.datetime.now(datetime.timezone.utc).timestamp()
+            )
+        try:
+            payload["name"] = normalize_quote_name(payload)
+        except Exception:
+            logger.debug(
+                "Failed to normalize imported quote name for id=%s", payload.get("id")
+            )
+        self.quotes.append(payload)
+        save_quotes(self.quotes)
+        po = payload.get("po_number")
+        po_str = f" [PO:{po}]" if po else ""
+        label = f"{payload.get('name')}{po_str} ({len(payload.get('items', []))} items)"
+        self.list_widget.addItem(label)
+        QtWidgets.QMessageBox.information(
+            self, "Import Quote", f"Imported quote '{payload.get('name')}'"
+        )
+
+
+class ArcsWindow(QtWidgets.QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle(APP_TITLE)
+        self.resize(1000, 700)
+        # Load the app icon robustly (try multiple formats and PIL fallback) and
+        # also show a small brand icon on the toolbar when available.
+        try:
+            pix = (
+                load_pixmap(APP_ICON) if APP_ICON and os.path.exists(APP_ICON) else None
+            )
+            if pix is not None and not pix.isNull():
+                self.setWindowIcon(QtGui.QIcon(pix))
+            else:
+                # fallback: try QIcon directly (may work for some formats)
+                if APP_ICON and os.path.exists(APP_ICON):
+                    qicon = QtGui.QIcon(APP_ICON)
+                    if not qicon.isNull():
+                        self.setWindowIcon(qicon)
+        except Exception:
+            logger.debug("Failed to set window icon", exc_info=True)
+
+        central = QtWidgets.QWidget()
+        self.setCentralWidget(central)
+        main_layout = QtWidgets.QVBoxLayout(central)
+
+        self.toolbar = QtWidgets.QToolBar()
+        self.addToolBar(self.toolbar)
+        self.toolbar.setMovable(False)
+        self.toolbar.setStyleSheet("QToolBar { padding: 4px 6px; }")
+        # If pixmap was loaded above, add a small brand icon to the left of the toolbar
+        try:
+            if hasattr(self, "windowIcon") and not self.windowIcon().isNull():
+                # Create a small pixmap for the toolbar
+                pix = self.windowIcon().pixmap(18, 18)
+                if pix and not pix.isNull():
+                    brand_lbl = QtWidgets.QLabel()
+                    brand_lbl.setPixmap(pix)
+                    brand_lbl.setContentsMargins(6, 8, 8, 6)
+                    # Insert brand label at beginning of toolbar
+                    first_action = (
+                        self.toolbar.actions()[0] if self.toolbar.actions() else None
+                    )
+                    if first_action:
+                        self.toolbar.insertWidget(first_action, brand_lbl)
+                    else:
+                        self.toolbar.addWidget(brand_lbl)
+                    self._brand_label = brand_lbl
+        except Exception:
+            logger.debug("Failed to add toolbar brand icon", exc_info=True)
+
+        self.btn_new = QtGui.QAction("New Quote", self)
+        self.btn_add = QtGui.QAction("Add Part", self)
+        self.btn_edit = QtGui.QAction("Edit Item", self)
+        self.btn_del = QtGui.QAction("Delete Item", self)
+        self.btn_save = QtGui.QAction("Save Quote", self)
+        self.btn_load = QtGui.QAction("Load Quote", self)
+        self.btn_pdf = QtGui.QAction("Export PDF", self)
+        self.btn_exit = QtGui.QAction("Exit", self)
+
+        for act in [
+            self.btn_new,
+            self.btn_add,
+            self.btn_edit,
+            self.btn_del,
+            self.btn_save,
+            self.btn_load,
+        ]:
+            self.toolbar.addAction(act)
+
+        self.toolbar.addSeparator()
+        ver_lbl = QtWidgets.QLabel(VERSION)
+        ver_lbl.setStyleSheet("margin-left: 8px;")
+        spacer = QtWidgets.QWidget()
+        spacer.setSizePolicy(
+            QtWidgets.QSizePolicy.Policy.Expanding,
+            QtWidgets.QSizePolicy.Policy.Preferred,
+        )
+        self.toolbar.addWidget(spacer)
+        self.toolbar.addWidget(ver_lbl)
+
+        # PO# entry
+        self.po_edit = QtWidgets.QLineEdit()
+        self.po_edit.setPlaceholderText("PO#")
+        self.toolbar.addWidget(self.po_edit)
+
+        # Table
+        self.table = QtWidgets.QTableWidget(0, 7)
+        self.table.setHorizontalHeaderLabels(
+            [
+                "Part #",
+                "Description",
+                "Qty",
+                "Unit Cost",
+                "List Price",
+                "Source",
+                "Line Total",
+            ]
+        )
+        self.table.horizontalHeader().setSectionResizeMode(
+            1, QtWidgets.QHeaderView.ResizeMode.Stretch
+        )
+        self.table.setSelectionBehavior(
+            QtWidgets.QAbstractItemView.SelectionBehavior.SelectRows
+        )
+        self.table.setEditTriggers(
+            QtWidgets.QAbstractItemView.EditTrigger.NoEditTriggers
+        )
+        # Alternating row colors and a compact look
+        self.table.setAlternatingRowColors(True)
+        palette = self.table.palette()
+        palette.setColor(QtGui.QPalette.ColorRole.Base, QtGui.QColor(PANEL_BG))
+        palette.setColor(
+            QtGui.QPalette.ColorRole.AlternateBase, QtGui.QColor(ALT_PANEL_BG)
+        )
+        palette.setColor(QtGui.QPalette.ColorRole.Text, QtGui.QColor(FG))
+        self.table.setPalette(palette)
+
+        main_layout.addWidget(self.table)
+
+        # total and notes
+        bottom_layout = QtWidgets.QHBoxLayout()
+        self.lbl_total = QtWidgets.QLabel("Total: $0.00")
+        bottom_layout.addWidget(self.lbl_total)
+        bottom_layout.addStretch()
+        main_layout.addLayout(bottom_layout)
+
+        self.notes = QtWidgets.QTextEdit()
+        self.notes.setPlaceholderText("Notes...")
+        self.notes.setFixedHeight(140)
+        main_layout.addWidget(self.notes)
+
+        # Connect actions
+        self.btn_new.triggered.connect(self.new_quote)
+        self.btn_add.triggered.connect(self.add_part)
+        self.btn_edit.triggered.connect(self.edit_item)
+        self.btn_del.triggered.connect(self.delete_item)
+        self.btn_save.triggered.connect(self.save_current)
+        self.btn_load.triggered.connect(self.load_quote)
+        self.btn_pdf.triggered.connect(self.export_pdf)
+        self.btn_exit.triggered.connect(self.close)
+
+        self.toolbar.addAction(self.btn_pdf)
+        self.toolbar.addAction(self.btn_exit)
+
+        self.table.doubleClicked.connect(self._on_table_double)
+
+        self.current = {"quote": None}
+        self.quotes = load_quotes()
+
+        if self.quotes:
+            quotes_sorted = sorted(
+                self.quotes, key=lambda x: x.get("created_at") or "", reverse=True
+            )
+            self.set_current_quote(quotes_sorted[0])
+
+    def set_current_quote(self, q):
+        self.current["quote"] = q
+        self.update_table()
+        self.update_totals()
+        self.po_edit.setText(q.get("po_number", ""))
+        self.notes.setPlainText(q.get("notes", ""))
+
+    def clear_current(self):
+        self.current["quote"] = None
+        self.update_table()
+        self.update_totals()
+        self.po_edit.clear()
+        self.notes.clear()
+
+    def new_quote(self):
+        q = create_quote()
+        self.set_current_quote(q)
+
+    def add_part(self):
+        if self.current.get("quote") is None:
+            self.new_quote()
+        dlg = AddEditPartDialog(self)
+        if dlg.exec() == QtWidgets.QDialog.DialogCode.Accepted:
+            item = dlg.get_data()
+            self.current["quote"]["items"].append(item)
+            self.update_table()
+            self.update_totals()
+
+    def update_table(self):
+        q = self.current.get("quote")
+        self.table.setRowCount(0)
         if not q:
-            lbl_total.configure(text="Total: $0.00")
             return
-        total = sum(it.get("line_total", 0.0) for it in q["items"])
-        lbl_total.configure(text=f"Total: ${total:.2f}")
+        for idx, it in enumerate(q.get("items", [])):
+            self.table.insertRow(self.table.rowCount())
+            self.table.setItem(
+                idx, 0, QtWidgets.QTableWidgetItem(it.get("part_number") or "")
+            )
+            self.table.setItem(
+                idx, 1, QtWidgets.QTableWidgetItem(it.get("description") or "")
+            )
+            self.table.setItem(
+                idx, 2, QtWidgets.QTableWidgetItem(str(it.get("quantity") or ""))
+            )
+            self.table.setItem(
+                idx,
+                3,
+                QtWidgets.QTableWidgetItem(f"{(it.get('unit_cost') or 0.0):.2f}"),
+            )
+            self.table.setItem(
+                idx,
+                4,
+                QtWidgets.QTableWidgetItem(f"{(it.get('list_price') or 0.0):.2f}"),
+            )
+            self.table.setItem(
+                idx, 5, QtWidgets.QTableWidgetItem(it.get("source") or "")
+            )
+            self.table.setItem(
+                idx,
+                6,
+                QtWidgets.QTableWidgetItem(f"{(it.get('line_total') or 0.0):.2f}"),
+            )
 
-    def delete_item():
-        sel = tree.selection()
-        if not sel:
-            messagebox.showinfo("Delete", "No item selected.")
+    def update_totals(self):
+        q = self.current.get("quote")
+        if not q:
+            self.lbl_total.setText("Total: $0.00")
             return
-        idx = int(sel[0])
-        if messagebox.askyesno("Delete", "Remove selected item?"):
-            q = current.get("quote")
+        total = sum(it.get("line_total", 0.0) for it in q.get("items", []))
+        self.lbl_total.setText(f"Total: ${total:.2f}")
+
+    def _selected_index(self):
+        sels = self.table.selectionModel().selectedRows()
+        if not sels:
+            return None
+        return sels[0].row()
+
+    def delete_item(self):
+        idx = self._selected_index()
+        if idx is None:
+            QtWidgets.QMessageBox.information(self, "Delete", "No item selected.")
+            return
+        if QtWidgets.QMessageBox.question(self, "Delete", "Remove selected item?"):
+            q = self.current.get("quote")
             if q and 0 <= idx < len(q["items"]):
                 q["items"].pop(idx)
-                update_tree()
-                update_totals()
+                self.update_table()
+                self.update_totals()
 
-    def edit_item():
-        sel = tree.selection()
-        if not sel:
-            messagebox.showinfo("Edit", "No item selected.")
+    def edit_item(self):
+        idx = self._selected_index()
+        if idx is None:
+            QtWidgets.QMessageBox.information(self, "Edit", "No item selected.")
             return
-        idx = int(sel[0])
-        q = current.get("quote")
+        q = self.current.get("quote")
         if not q or not (0 <= idx < len(q["items"])):
             return
         it = q["items"][idx]
+        dlg = AddEditPartDialog(self, item=it)
+        if dlg.exec() == QtWidgets.QDialog.DialogCode.Accepted:
+            data = dlg.get_data()
+            q["items"][idx] = data
+            self.update_table()
+            self.update_totals()
 
-        def _submit_edit():
-            it["part_number"] = ent_part.get().strip()
-            it["description"] = ent_desc.get().strip()
-            try:
-                it["quantity"] = int(ent_qty.get())
-            except ValueError:
-                it["quantity"] = 1
-            try:
-                it["unit_cost"] = float(ent_unit.get())
-            except ValueError:
-                it["unit_cost"] = 0.0
-            try:
-                it["list_price"] = float(ent_list.get())
-            except ValueError:
-                it["list_price"] = 0.0
-            it["source"] = ent_source.get().strip()
-            it["line_total"] = round(it["quantity"] * it["unit_cost"], 2)
-            update_tree()
-            update_totals()
-            edit_part_window.destroy()
+    def _on_table_double(self, index):
+        self.edit_item()
 
-        edit_part_window = tk.Toplevel(root)
-        edit_part_window.title("Edit Part")
-        edit_part_window.transient(root)
-        edit_part_window.grab_set()
-
-        lbl_part = ttk.Label(edit_part_window, text="Part #")
-        lbl_part.grid(row=0, column=0, sticky="e")
-        ent_part = ttk.Entry(edit_part_window)
-        ent_part.insert(0, it.get("part_number", ""))
-        ent_part.grid(row=0, column=1, sticky="we")
-
-        lbl_desc = ttk.Label(edit_part_window, text="Description")
-        lbl_desc.grid(row=1, column=0, sticky="e")
-        ent_desc = ttk.Entry(edit_part_window)
-        ent_desc.insert(0, it.get("description", ""))
-        ent_desc.grid(row=1, column=1, sticky="we")
-
-        lbl_qty = ttk.Label(edit_part_window, text="Qty")
-        lbl_qty.grid(row=2, column=0, sticky="e")
-        ent_qty = ttk.Entry(edit_part_window)
-        ent_qty.insert(0, str(it.get("quantity", 1)))
-        ent_qty.grid(row=2, column=1, sticky="we")
-
-        lbl_unit = ttk.Label(edit_part_window, text="Unit Cost")
-        lbl_unit.grid(row=3, column=0, sticky="e")
-        ent_unit = ttk.Entry(edit_part_window)
-        ent_unit.insert(0, f"{it.get('unit_cost', 0.0):.2f}")
-        ent_unit.grid(row=3, column=1, sticky="we")
-
-        lbl_list = ttk.Label(edit_part_window, text="List Price")
-        lbl_list.grid(row=4, column=0, sticky="e")
-        ent_list = ttk.Entry(edit_part_window)
-        ent_list.insert(0, f"{it.get('list_price', 0.0):.2f}")
-        ent_list.grid(row=4, column=1, sticky="we")
-
-        lbl_source = ttk.Label(edit_part_window, text="Source")
-        lbl_source.grid(row=5, column=0, sticky="e")
-        ent_source = ttk.Entry(edit_part_window)
-        ent_source.insert(0, it.get("source", ""))
-        ent_source.grid(row=5, column=1, sticky="we")
-
-        btn = ttk.Button(edit_part_window, text="Save", command=_submit_edit)
-        btn.grid(row=6, column=0, columnspan=2, pady=(8, 4))
-
-        edit_part_window.columnconfigure(1, weight=1)
-
-    def save_current(silent=False):
-        quotes = load_quotes()
-        q = current.get("quote")
+    def save_current(self, silent=False):
+        q = self.current.get("quote")
         if not q:
             logger.debug("save_current called with no current quote")
             return
-        try:
-            q["notes"] = notes_text.get("1.0", "end").rstrip("\n")
-        except Exception as e:
-            logger.debug("Failed to read notes text: %s", e)
-            try:
-                q["name"] = format_quote_name(q)
-            except Exception:
-                logger.debug("Failed to normalize quote name for id=%s", q.get("id"))
+        q["notes"] = self.notes.toPlainText().rstrip("\n")
+        q["po_number"] = self.po_edit.text().strip()
+        quotes = load_quotes()
         existing = [x for x in quotes if x.get("id") == q.get("id")]
         if existing:
             quotes = [x for x in quotes if x.get("id") != q.get("id")]
@@ -423,139 +572,28 @@ def build_ui():
         logger.info("Saving current quote id=%s name=%s", q.get("id"), q.get("name"))
         save_quotes(quotes)
         if not silent:
-            messagebox.showinfo("Save", "Quote saved.")
+            QtWidgets.QMessageBox.information(self, "Save", "Quote saved.")
 
-    def _set_po_from_entry(event=None):
-        val = po_entry_var.get().strip()
-        if not val and current.get("quote") is None:
-            return
-        if current.get("quote") is None:
-            new_quote()
-        current["quote"]["po_number"] = val
-
-    def load_quote():
+    def load_quote(self):
         quotes = load_quotes()
         if not quotes:
-            messagebox.showinfo("Load Quote", "No saved quotes found.")
+            QtWidgets.QMessageBox.information(
+                self, "Load Quote", "No saved quotes found."
+            )
             return
+        dlg = LoadQuoteDialog(self, quotes=quotes)
+        if dlg.exec() == QtWidgets.QDialog.DialogCode.Accepted:
+            q = dlg.selected
+            if q:
+                self.set_current_quote(q)
 
-        def _quote_label(q):
-            po = q.get("po_number")
-            po_str = f" [PO:{po}]" if po else ""
-            return f"{q.get('name')}{po_str} ({len(q.get('items', []))} items)"
-
-        load_quote_window = tk.Toplevel(root)
-        load_quote_window.title("Load Quote")
-        load_quote_window.transient(root)
-        load_quote_window.grab_set()
-
-        lb = tk.Listbox(load_quote_window, width=60)
-        for q in quotes:
-            lb.insert("end", _quote_label(q))
-        lb.pack(fill="both", expand=True)
-
-        def _load():
-            sel = lb.curselection()
-            if not sel:
-                return
-            idx = int(sel[0])
-            q = quotes[idx]
-            set_current_quote(q)
-            load_quote_window.destroy()
-
-        def _delete():
-            sel = lb.curselection()
-            if not sel:
-                messagebox.showinfo("Delete Quote", "No quote selected.")
-                return
-            idx = int(sel[0])
-            q = quotes[idx]
-            if not messagebox.askyesno(
-                "Delete Quote", f"Delete quote '{q.get('name')}'?"
-            ):
-                return
-            del quotes[idx]
-            save_quotes(quotes)
-            lb.delete(idx)
-            if current.get("quote") and current["quote"].get("id") == q.get("id"):
-                clear_current()
-
-        def _export():
-            sel = lb.curselection()
-            if not sel:
-                messagebox.showinfo("Export Quote", "No quote selected.")
-                return
-            idx = int(sel[0])
-            q = quotes[idx]
-            suggested = _safe_filename(format_quote_name(q))
-            fn = filedialog.asksaveasfilename(
-                defaultextension=".json",
-                filetypes=[("JSON files", "*.json"), ("All files", "*.*")],
-                initialfile=f"{suggested}.json",
-            )
-            if not fn:
-                return
-            with open(fn, "w") as f:
-                json.dump(q, f, indent=4, default=str)
-            messagebox.showinfo("Export Quote", f"Quote exported to {fn}")
-
-        def _import():
-            fn = filedialog.askopenfilename(
-                filetypes=[("JSON files", "*.json"), ("All files", "*.*")]
-            )
-            if not fn:
-                return
-            try:
-                with open(fn, "r") as f:
-                    payload = json.load(f)
-            except Exception as e:
-                messagebox.showerror("Import Quote", f"Failed to read file: {e}")
-                return
-            if not isinstance(payload, dict) or "items" not in payload:
-                messagebox.showerror(
-                    "Import Quote", "File does not appear to be a valid quote JSON."
-                )
-                return
-            existing_ids = {x.get("id") for x in quotes}
-            if payload.get("id") in existing_ids:
-                payload["id"] = int(
-                    datetime.datetime.now(datetime.timezone.utc).timestamp()
-                )
-            try:
-                payload["name"] = format_quote_name(payload)
-            except Exception:
-                logger.debug(
-                    "Failed to normalize imported quote name for id=%s",
-                    payload.get("id"),
-                )
-            quotes.append(payload)
-            save_quotes(quotes)
-            lb.insert("end", _quote_label(payload))
-            messagebox.showinfo(
-                "Import Quote", f"Imported quote '{payload.get('name')}'"
-            )
-
-        btn_frame = tk.Frame(load_quote_window)
-        btn_frame.pack(fill="x", pady=6)
-        btn_load = ttk.Button(btn_frame, text="Load", command=_load)
-        btn_load.pack(side="left", padx=6)
-        btn_del = ttk.Button(btn_frame, text="Delete", command=_delete)
-        btn_del.pack(side="left", padx=6)
-        btn_exp = ttk.Button(btn_frame, text="Export", command=_export)
-        btn_exp.pack(side="left", padx=6)
-        btn_imp = ttk.Button(btn_frame, text="Import", command=_import)
-        btn_imp.pack(side="left", padx=6)
-        btn_close = ttk.Button(
-            btn_frame, text="Close", command=load_quote_window.destroy
-        )
-        btn_close.pack(side="right", padx=6)
-
-    def export_pdf():
-        q = current.get("quote")
+    def export_pdf(self):
+        q = self.current.get("quote")
         if not q:
-            messagebox.showinfo("Export", "No current quote to export.")
+            QtWidgets.QMessageBox.information(
+                self, "Export", "No current quote to export."
+            )
             return
-        # Create a temporary PDF file and open it in the default viewer
         fd, path = tempfile.mkstemp(suffix=".pdf")
         os.close(fd)
         c = canvas.Canvas(path, pagesize=letter)
@@ -566,7 +604,6 @@ def build_ui():
         c.setFont("Helvetica-Bold", 14)
         c.drawString(72, y, q.get("name"))
         y -= 30
-        # Page margins / left-right offset
         left = 72
         right = 72
         po = q.get("po_number")
@@ -596,10 +633,8 @@ def build_ui():
                     f"${(it.get('line_total') or 0.0):.2f}",
                 ]
             )
-
         total = sum(it.get("line_total", 0.0) for it in q.get("items", []))
         data.append(["", "", "", "", "Total", f"${total:.2f}"])
-
         table = Table(data, colWidths=col_widths)
         table.repeatRows = 1
         table.setStyle(
@@ -613,17 +648,10 @@ def build_ui():
                     ("ALIGN", (4, -1), (5, -1), "RIGHT"),
                     ("FONTNAME", (0, -1), (-1, -1), "Helvetica-Bold"),
                     ("GRID", (0, 0), (-1, -1), 0.25, colors.grey),
-                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-                    ("BOTTOMPADDING", (0, 0), (-1, 0), 6),
-                    ("TOPPADDING", (0, 0), (-1, 0), 6),
-                    ("LEFTPADDING", (0, 0), (-1, -1), 8),
-                    ("RIGHTPADDING", (0, 0), (-1, -1), 8),
                 ]
             )
         )
-
-        # Draw the table and handle simple page overflow
-        w, h = table.wrapOn(c, available_width, y)
+        h = table.wrapOn(c, available_width, y)
         if h > (y - 72):
             c.showPage()
             y = 750
@@ -639,194 +667,59 @@ def build_ui():
                 c.drawString(left, y, f"PO#: {po}")
                 y -= 16
             w, h = table.wrapOn(c, available_width, y)
-
         table.drawOn(c, left, y - h)
         y = y - h - 12
         c.save()
         webbrowser.open("file://" + path)
 
-    try:
-        _small_icon = None
-        if APP_ICON and os.path.exists(APP_ICON):
-            try:
-                # Prefer Pillow for reliable resizing and multi-format support
-                from PIL import Image, ImageTk
-
-                img = Image.open(APP_ICON)
-                img = img.convert("RGBA")
-                img = img.resize((18, 18), Image.LANCZOS)
-                _small_icon = ImageTk.PhotoImage(img)
-            except Exception:
-                # Fallback to Tk PhotoImage (may support PNG/GIF)
-                try:
-                    _small_icon = tk.PhotoImage(file=APP_ICON)
-                except Exception:
-                    _small_icon = None
-        if _small_icon:
-            root._small_icon = _small_icon
-            brand_lbl = tk.Label(
-                toolbar, image=_small_icon, compound="left", bg=TOOLBAR_BG, fg=FG
-            )
-            brand_lbl.pack(side="left", padx=(6, 8), pady=6)
-        else:
-            # Pack a label anyway, gotta make it look consistent
-            brand_lbl = tk.Label(toolbar, text=APP_TITLE, bg=TOOLBAR_BG, fg=FG)
-            brand_lbl.pack(side="left", padx=(6, 8), pady=6)
-    except Exception:
-        logger.debug("Failed to load toolbar icon: ", exc_info=True)
-        pass
-
-    btn_new = ttk.Button(toolbar, text="New Quote", command=new_quote)
-    btn_new.pack(side="left", padx=6, pady=6)
-    btn_add = ttk.Button(toolbar, text="Add Part", command=add_part)
-    btn_add.pack(side="left", padx=6, pady=6)
-    btn_edit = ttk.Button(toolbar, text="Edit Item", command=edit_item)
-    btn_edit.pack(side="left", padx=6, pady=6)
-    btn_del = ttk.Button(toolbar, text="Delete Item", command=delete_item)
-    btn_del.pack(side="left", padx=6, pady=6)
-    btn_save = ttk.Button(toolbar, text="Save Quote", command=save_current)
-    btn_save.pack(side="left", padx=6, pady=6)
-    btn_load = ttk.Button(toolbar, text="Load Quote", command=load_quote)
-    btn_load.pack(side="left", padx=6, pady=6)
-    ver_lbl = ttk.Label(toolbar, text=VERSION)
-    ver_lbl.pack(side="right", padx=6)
-    platform_name_font_size = 10
-    plat_name = "macOS" if platform.system() == "Darwin" else platform.system()
-    small_font = tkfont.Font(family="Helvetica", size=platform_name_font_size)
-    plat_lbl = tk.Label(toolbar, text=plat_name, bg=TOOLBAR_BG, fg=FG, font=small_font)
-    plat_lbl.pack(side="right", padx=(0, 6))
-
-    btn_pdf = ttk.Button(toolbar, text="Export PDF", command=export_pdf)
-    btn_pdf.pack(side="right", padx=6, pady=6)
-
-    def _exit_app(event=None):
-        q = current.get("quote")
+    def closeEvent(self, event: QtGui.QCloseEvent) -> None:
+        q = self.current.get("quote")
         if q:
-            ans = messagebox.askyesnocancel(
-                "Exit", "Save current quote before exiting?"
+            res = QtWidgets.QMessageBox.question(
+                self,
+                "Exit",
+                "Save current quote before exiting?",
+                QtWidgets.QMessageBox.StandardButton.Yes
+                | QtWidgets.QMessageBox.StandardButton.No
+                | QtWidgets.QMessageBox.StandardButton.Cancel,
             )
-            if ans is None:
+            if res == QtWidgets.QMessageBox.StandardButton.Cancel:
+                event.ignore()
                 return
-            if ans:
-                save_current()
-            root.destroy()
-        else:
-            if messagebox.askyesno("Exit", "Are you sure you want to quit?"):
-                root.destroy()
-
-    btn_exit = ttk.Button(toolbar, text="Exit", command=_exit_app)
-    btn_exit.pack(side="right", padx=6, pady=6)
-
-    # PO# label and entry on the toolbar
-    lbl_po = ttk.Label(toolbar, text="PO#")
-    lbl_po.pack(side="left", padx=(12, 2))
-    po_entry = ttk.Entry(toolbar, textvariable=po_entry_var, width=18)
-    po_entry.pack(side="left", padx=(2, 12))
-    # Update current quote when PO entry loses focus or on Enter
-    po_entry.bind("<Return>", lambda e: _set_po_from_entry())
-    po_entry.bind("<FocusOut>", lambda e: _set_po_from_entry())
-    cols = ("part", "desc", "qty", "unit", "list", "source", "line")
-    tree = ttk.Treeview(content, columns=cols, show="headings")
-    tree.place(relx=0.02, rely=0.12, relwidth=0.96, relheight=0.60)
-    headings = [
-        "Part #",
-        "Description",
-        "Qty",
-        "Unit Cost",
-        "List Price",
-        "Source",
-        "Line Total",
-    ]
-    for c, h in zip(cols, headings):
-        tree.heading(c, text=h)
-
-    # Set sensible default column widths so everything fits without resizing
-    # Total available width approx: 0.96 * window_width (~1000) => ~960 px
-    col_widths = {
-        "part": 110,
-        "desc": 330,
-        "qty": 60,
-        "unit": 80,
-        "list": 80,
-        "source": 140,
-        "line": 120,
-    }
-    for col, w in col_widths.items():
-        tree.column(col, width=w, anchor="w", stretch=(col == "desc"))
-
-    # Configure tags to avoid hover/active white background issues
-    tree.tag_configure("row_even", background=PANEL_BG, foreground=FG)
-    tree.tag_configure("row_odd", background=PANEL_BG, foreground=FG)
-    tree.tag_configure("selected", background=SELECT_BG, foreground="#ffffff")
-
-    def refresh_tags(event=None):
-        sel = set(tree.selection())
-        for idx, iid in enumerate(tree.get_children()):
-            if iid in sel:
-                tree.item(iid, tags=("selected",))
-            else:
-                tag = "row_even" if (idx % 2 == 0) else "row_odd"
-                tree.item(iid, tags=(tag,))
-
-    tree.bind("<<TreeviewSelect>>", refresh_tags)
-    tree.bind("<Enter>", refresh_tags)
-    tree.bind("<Leave>", refresh_tags)
-
-    # Total Label
-    lbl_total = tk.Label(content, text="Total: $0.00", bg=bg_color)
-    lbl_total.place(relx=0.02, rely=0.75)
-    lbl_total.configure(font=button_font, foreground=FG)
-
-    # Notes area
-    notes_frame = tk.Frame(content, bg=PANEL_BG, bd=0)
-    notes_frame.place(relx=0.02, rely=0.78, relwidth=0.96, relheight=0.20)
-    notes_label = ttk.Label(notes_frame, text="Notes:")
-    notes_label.pack(anchor="nw", padx=6, pady=(6, 0))
-    notes_text = tk.Text(
-        notes_frame,
-        wrap="word",
-        height=5,
-        bg=PANEL_BG,
-        fg=FG,
-        insertbackground=FG,
-        relief="flat",
-        bd=0,
-        font=body_font,
-        highlightthickness=1,
-        highlightbackground="#2a2a2a",
-    )
-    notes_text.pack(fill="both", expand=True, padx=6, pady=6)
-
-    # Keep notes synced with current quote
-    def _load_notes_for_quote(q):
-        notes_text.delete("1.0", "end")
-        if q:
-            notes_text.insert("1.0", q.get("notes", ""))
-
-    # Save notes back into the quote when focus leaves the notes area
-    def _save_notes(event=None):
-        q = current.get("quote")
-        if not q:
-            return
-        q["notes"] = notes_text.get("1.0", "end").rstrip("\n")
-
-    notes_text.bind("<FocusOut>", _save_notes)
-
-    # If quotes exist, load the most recent by default
-    quotes = load_quotes()
-    if quotes:
-        # pick the most recently created (by created_at)
-        quotes_sorted = sorted(
-            quotes, key=lambda x: x.get("created_at") or "", reverse=True
-        )
-        set_current_quote(quotes_sorted[0])
-
-    return root
+            if res == QtWidgets.QMessageBox.StandardButton.Yes:
+                self.save_current()
+        event.accept()
 
 
 def main():
-    root = build_ui()
-    root.mainloop()
+    app = QtWidgets.QApplication([])
+    # Build a local stylesheet from the company colors and apply it
+    stylesheet = f"""
+QMainWindow {{ background-color: {UI_BG}; color: {FG}; }}
+QToolBar {{ background-color: {TOOLBAR_BG}; spacing: 8px; padding: 6px; }}
+QToolBar QLabel {{ color: {FG}; margin-left: 6px; margin-right: 8px; }}
+QPushButton, QToolButton {{ background-color: transparent; color: {FG}; border: 1px solid rgba(255,255,255,0.04); padding: 6px 10px; border-radius:6px; }}
+QPushButton:hover, QToolButton:hover {{ background-color: {ACCENT}; color: #ffffff; }}
+QHeaderView::section {{ background-color: {TOOLBAR_BG}; color: {FG}; padding:6px; border: none; }}
+QTableWidget {{ background-color: {PANEL_BG}; color: {FG}; gridline-color: rgba(255,255,255,0.03); selection-background-color: {ACCENT}; selection-color: #ffffff; }}
+QTableWidget::item:selected {{ background-color: {ACCENT}; color: #ffffff; }}
+QTextEdit, QLineEdit {{ background-color: {PANEL_BG}; color: {FG}; border: 1px solid rgba(255,255,255,0.03); padding:4px; }}
+QLabel {{ color: {FG}; }}
+QMenuBar {{ background-color: {TOOLBAR_BG}; color: {FG}; }}
+"""
+    app.setStyleSheet(stylesheet)
+    pal = app.palette()
+    pal.setColor(QtGui.QPalette.ColorRole.Window, QtGui.QColor(UI_BG))
+    pal.setColor(QtGui.QPalette.ColorRole.Base, QtGui.QColor(PANEL_BG))
+    pal.setColor(QtGui.QPalette.ColorRole.AlternateBase, QtGui.QColor(ALT_PANEL_BG))
+    pal.setColor(QtGui.QPalette.ColorRole.WindowText, QtGui.QColor(FG))
+    pal.setColor(QtGui.QPalette.ColorRole.Highlight, QtGui.QColor(ACCENT))
+    pal.setColor(QtGui.QPalette.ColorRole.HighlightedText, QtGui.QColor("#ffffff"))
+    app.setPalette(pal)
+
+    win = ArcsWindow()
+    win.show()
+    app.exec()
 
 
 if __name__ == "__main__":

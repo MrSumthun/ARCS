@@ -17,9 +17,9 @@ def get_resource_path(rel_path: str) -> str:
 
 def user_data_dir() -> str:
     home = os.path.expanduser("~")
-    d = os.path.join(home, ".arcsoftware")
-    os.makedirs(d, exist_ok=True)
-    return d
+    _userDirectory = os.path.join(home, ".arcsoftware")
+    os.makedirs(_userDirectory, exist_ok=True)
+    return _userDirectory
 
 
 def atomic_write_json(path: str, data: Any) -> None:
@@ -32,10 +32,7 @@ def atomic_write_json(path: str, data: Any) -> None:
         os.replace(tmp_path, path)
     finally:
         if os.path.exists(tmp_path):
-            try:
-                os.remove(tmp_path)
-            except OSError:
-                pass
+            os.remove(tmp_path)
 
 
 def load_json_file(path: str) -> List[Dict[str, Any]]:

@@ -21,6 +21,12 @@ Developer / contributor (optional)
 2. pip3 install -r requirements.txt
 3. (Dev only) Run: `python3 arcs.py`
 
+Tip: a modern PyQt-based UI is available — install `PyQt6` (or run `pip3 install -r data/requirements.txt`) and launch:
+
+```
+python3 arcs.py --qt   # or --pyqt
+```
+
 Core features
 
 - Add/edit/delete parts (part #, description, qty, unit cost, list price, source)

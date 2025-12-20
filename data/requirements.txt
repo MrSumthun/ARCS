@@ -1,6 +1,7 @@
 # Minimal runtime requirements for ARCS
 # Install with: pip3 install -r requirements.txt
 
+PyQt6>=6.6
 Pillow
 reportlab
 
