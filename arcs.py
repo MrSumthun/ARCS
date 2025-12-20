@@ -25,7 +25,7 @@ from arcs_utils import (
 # Le constants
 # Mr_SuMtHuN 2025
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
-VERSION = "v1.0.4-beta"
+VERSION = "v1.0.5-beta"
 APP_NAME = "ARCS"
 APP_TITLE = "ARCS Quote Manager"
 
@@ -40,6 +40,7 @@ ACCENT3 = "#ffffff"
 
 BUNDLED_QUOTES_FILE = get_resource_path(os.path.join("data", "quotes.json"))
 APP_ICON = get_resource_path(os.path.join("data", "app.ico"))
+APP_ICNS = get_resource_path(os.path.join("data", "app.icns"))
 QUOTES_FILE = os.path.join(user_data_dir(), "quotes.json")
 LOG_FILE = os.path.join(user_data_dir(), "arcsoftware.log")
 logger = logging.getLogger("arcsoftware")
@@ -704,6 +705,18 @@ def main():
 
     app.setApplicationName(APP_NAME)
     app.setApplicationDisplayName(APP_TITLE)
+
+    try:
+        import platform as _platform
+
+        if _platform.system() == "Darwin" and APP_ICNS and os.path.exists(APP_ICNS):
+            try:
+                app.setWindowIcon(QtGui.QIcon(APP_ICNS))
+            except Exception:
+                logger.debug("Failed to set application icon on QApplication", exc_info=True)
+    except Exception:
+        logger.debug("Failed to determine platform for app icon", exc_info=True)
+
     win = ArcsWindow()
     win.show()
     app.exec()
@@ -729,7 +742,9 @@ def get_app_stylesheet() -> str:
             "ACCENT2": ACCENT2,
             "ACCENT3": ACCENT3,
         }
-        return raw.format(**fmt)
+        for k, v in fmt.items():
+            raw = raw.replace(f"{{{k}}}", v)
+        return raw
     except Exception:
         logger.debug("Failed to format stylesheet with theme variables", exc_info=True)
         return ""
