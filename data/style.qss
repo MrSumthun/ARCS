@@ -1,0 +1,11 @@
+QMainWindow { background-color: {UI_BG}; color: {FG}; }
+QToolBar { background-color: {TOOLBAR_BG}; spacing: 8px; padding: 6px; }
+QToolBar QLabel { color: {FG}; margin-left: 6px; margin-right: 8px; }
+QPushButton, QToolButton { background-color: transparent; color: {FG}; border: 1px solid rgba(255,255,255,0.04); padding: 6px 10px; border-radius:6px; }
+QPushButton:hover, QToolButton:hover { background-color: {ACCENT}; color: #ffffff; }
+QHeaderView::section { background-color: {TOOLBAR_BG}; color: {FG}; padding:6px; border: none; }
+QTableWidget { background-color: {PANEL_BG}; color: {FG}; gridline-color: rgba(255,255,255,0.03); selection-background-color: {ACCENT}; selection-color: #ffffff; }
+QTableWidget::item:selected { background-color: {ACCENT}; color: #ffffff; }
+QTextEdit, QLineEdit { background-color: {PANEL_BG}; color: {FG}; border: 1px solid rgba(255,255,255,0.03); padding:4px; }
+QLabel { color: {FG}; }
+QMenuBar { background-color: {TOOLBAR_BG}; color: {FG}; }

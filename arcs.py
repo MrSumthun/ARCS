@@ -1,3 +1,5 @@
+# arcs.py
+# Main application for ARCS Quote Manager
 import json
 import os
 import tempfile
@@ -5,7 +7,7 @@ import datetime
 import webbrowser
 import logging
 
-from PyQt6 import QtCore, QtGui, QtWidgets
+from PyQt6 import QtGui, QtWidgets
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 from reportlab.platypus import Table, TableStyle
@@ -70,27 +72,8 @@ def load_pixmap(path: str) -> "QtGui.QPixmap | None":
     if not path or not os.path.exists(path):
         return None
 
-    pix = QtGui.QPixmap(path)
-    if not pix.isNull():
-        return pix
-
-    try:
-        from PIL import Image
-        import io
-
-        img = Image.open(path)
-        if img.mode not in ("RGBA", "RGB"):
-            img = img.convert("RGBA")
-        buf = io.BytesIO()
-        img.save(buf, format="PNG")
-        data = buf.getvalue()
-        pix2 = QtGui.QPixmap()
-        if pix2.loadFromData(data, "PNG"):
-            return pix2
-    except Exception:
-        logger.debug("PIL fallback failed for icon: %s", path, exc_info=True)
-
-    return None
+    iconPixMap = QtGui.QPixmap(path)
+    return iconPixMap if not iconPixMap.isNull() else None
 
 
 def save_quotes(quotes):
@@ -168,10 +151,10 @@ class LoadQuoteDialog(QtWidgets.QDialog):
         layout = QtWidgets.QVBoxLayout(self)
 
         self.list_widget = QtWidgets.QListWidget()
-        for q in self.quotes:
-            po = q.get("po_number")
+        for quote_item in self.quotes:
+            po = quote_item.get("po_number")
             po_str = f" [PO:{po}]" if po else ""
-            label = f"{q.get('name')}{po_str} ({len(q.get('items', []))} items)"
+            label = f"{quote_item.get('name')}{po_str} ({len(quote_item.get('items', []))} items)"
             item = QtWidgets.QListWidgetItem(label)
             self.list_widget.addItem(item)
         layout.addWidget(self.list_widget)
@@ -298,8 +281,7 @@ class ArcsWindow(QtWidgets.QMainWindow):
         super().__init__()
         self.setWindowTitle(APP_TITLE)
         self.resize(1000, 700)
-        # Load the app icon robustly (try multiple formats and PIL fallback) and
-        # also show a small brand icon on the toolbar when available.
+
         try:
             pix = (
                 load_pixmap(APP_ICON) if APP_ICON and os.path.exists(APP_ICON) else None
@@ -693,21 +675,10 @@ class ArcsWindow(QtWidgets.QMainWindow):
 
 def main():
     app = QtWidgets.QApplication([])
-    # Build a local stylesheet from the company colors and apply it
-    stylesheet = f"""
-QMainWindow {{ background-color: {UI_BG}; color: {FG}; }}
-QToolBar {{ background-color: {TOOLBAR_BG}; spacing: 8px; padding: 6px; }}
-QToolBar QLabel {{ color: {FG}; margin-left: 6px; margin-right: 8px; }}
-QPushButton, QToolButton {{ background-color: transparent; color: {FG}; border: 1px solid rgba(255,255,255,0.04); padding: 6px 10px; border-radius:6px; }}
-QPushButton:hover, QToolButton:hover {{ background-color: {ACCENT}; color: #ffffff; }}
-QHeaderView::section {{ background-color: {TOOLBAR_BG}; color: {FG}; padding:6px; border: none; }}
-QTableWidget {{ background-color: {PANEL_BG}; color: {FG}; gridline-color: rgba(255,255,255,0.03); selection-background-color: {ACCENT}; selection-color: #ffffff; }}
-QTableWidget::item:selected {{ background-color: {ACCENT}; color: #ffffff; }}
-QTextEdit, QLineEdit {{ background-color: {PANEL_BG}; color: {FG}; border: 1px solid rgba(255,255,255,0.03); padding:4px; }}
-QLabel {{ color: {FG}; }}
-QMenuBar {{ background-color: {TOOLBAR_BG}; color: {FG}; }}
-"""
-    app.setStyleSheet(stylesheet)
+    stylesheet = get_app_stylesheet()
+    if stylesheet:
+        app.setStyleSheet(stylesheet)
+
     pal = app.palette()
     pal.setColor(QtGui.QPalette.ColorRole.Window, QtGui.QColor(UI_BG))
     pal.setColor(QtGui.QPalette.ColorRole.Base, QtGui.QColor(PANEL_BG))
@@ -720,6 +691,32 @@ QMenuBar {{ background-color: {TOOLBAR_BG}; color: {FG}; }}
     win = ArcsWindow()
     win.show()
     app.exec()
+
+
+def get_app_stylesheet() -> str:
+    qss_path = get_resource_path(os.path.join("data", "style.qss"))
+    try:
+        with open(qss_path, "r", encoding="utf-8") as fh:
+            raw = fh.read()
+    except Exception:
+        logger.debug("Style QSS not found or unreadable: %s", qss_path, exc_info=True)
+        return ""
+
+    try:
+        fmt = {
+            "UI_BG": UI_BG,
+            "TOOLBAR_BG": TOOLBAR_BG,
+            "PANEL_BG": PANEL_BG,
+            "ALT_PANEL_BG": ALT_PANEL_BG,
+            "FG": FG,
+            "ACCENT": ACCENT,
+            "ACCENT2": ACCENT2,
+            "ACCENT3": ACCENT3,
+        }
+        return raw.format(**fmt)
+    except Exception:
+        logger.debug("Failed to format stylesheet with theme variables", exc_info=True)
+        return ""
 
 
 if __name__ == "__main__":
