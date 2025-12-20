@@ -1,6 +1,6 @@
 # ARCS
 
-[![Python](https://img.shields.io/badge/Python-3.8%2B-blue)](https://www.python.org/) [![Platform](https://img.shields.io/badge/Platform-macOS%20%7C%20Windows-brightgreen)]() [![Version](https://img.shields.io/badge/Version-1.0.3-purple)]() [![Status](https://img.shields.io/badge/Status-Beta-yellow)]() [![UI](https://img.shields.io/badge/UI-Tkinter-orange)]()
+[![Python](https://img.shields.io/badge/Python-3.8%2B-blue)](https://www.python.org/) [![Platform](https://img.shields.io/badge/Platform-macOS%20%7C%20Windows-brightgreen)]() [![Version](https://img.shields.io/badge/Version-1.0.4-purple)]() [![Status](https://img.shields.io/badge/Status-Beta-yellow)]() [![Qt](https://img.shields.io/badge/Qt-2CDE85?logo=Qt&logoColor=fff)](#)
 
 Lightweight RFQ/quoting app built with Tkinter. Add parts, set PO#, save/load quotes as JSON, and export printable PDFs.
 
@@ -18,14 +18,8 @@ End user (recommended)
 Developer / contributor (optional)
 
 1. Install Python 3.8+.
-2. pip3 install -r requirements.txt
+2. pip3 install -r data/requirements.txt
 3. (Dev only) Run: `python3 arcs.py`
-
-Tip: a modern PyQt-based UI is available — install `PyQt6` (or run `pip3 install -r data/requirements.txt`) and launch:
-
-```
-python3 arcs.py --qt   # or --pyqt
-```
 
 Core features
 
@@ -34,18 +28,10 @@ Core features
 - Export/import single quotes (JSON) and export printable PDF (ReportLab or HTML fallback)
 - PO# toolbar, notes area, and totals
 
-Build notes 🛠️
-
-Use the included helper scripts to build distributables:
-
-- macOS: run `./buildtools/macOSBuild` (on macOS; script runs `pyinstaller data/ARCS.spec` from the repo root)
-- Windows: run `./buildtools/windowsBuild.bat` (on Windows; script runs `pyinstaller data\ARCS.spec` from the repo root)
-
-If you prefer to run PyInstaller manually, consult the PyInstaller docs — the helper scripts show a recommended configuration.
-
 Developer notes
 
 - Main module: `arcs.py`.
 - Use `get_resource_path()` from `arcs_utils` to locate bundled resources under PyInstaller (`sys._MEIPASS`).
 - Linting: repo uses `flake8` (max line length 120). Auto-formatting with `black` is recommended.
 - Use `purchase_list.py` for CLI-based purchase lists.
+- Use `arcs_TK` available for older Tkinter version compatibility
