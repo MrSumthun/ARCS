@@ -1,6 +1,3 @@
-# purchase_list.py
-# Prints per-quote summaries for purchasing
-# --json: output JSON instead of text table
 from __future__ import annotations
 
 import argparse
@@ -12,6 +9,8 @@ REPO_ROOT = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
 BUNDLED_QUOTES = os.path.join(REPO_ROOT, "data", "quotes.json")
 USER_QUOTE_DIR = os.path.join(os.path.expanduser("~"), ".arcsoftware")
 USER_QUOTES = os.path.join(USER_QUOTE_DIR, "quotes.json")
+# --json: output JSON instead of text table
+# Wrote this code with a couple of beers, only God knows how it works now.
 
 
 def load_quotes_from(path: str):
@@ -63,7 +62,6 @@ def print_table(rows):
 
 
 def print_per_quote(quotes: List[Dict[str, Any]]):
-    """Print parts grouped per quote (no global aggregation)."""
     if not quotes:
         print("No quotes to show.")
         return

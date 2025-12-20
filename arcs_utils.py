@@ -1,5 +1,3 @@
-# arcs_utils.py
-# Handler utilities for ARCS application data
 from __future__ import annotations
 
 import json
@@ -11,6 +9,7 @@ import re
 from typing import Any, Dict, List, Optional
 
 
+# This simplifys the arcs.py file, makes it less then 9000 lines. Way better.
 def get_resource_path(rel_path: str) -> str:
     if getattr(sys, "frozen", False):
         return os.path.join(sys._MEIPASS, rel_path)

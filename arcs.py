@@ -1,5 +1,3 @@
-# arcs.py
-# Main application for ARCS Quote Manager
 import json
 import os
 import tempfile
@@ -24,17 +22,19 @@ from arcs_utils import (
     safe_filename,
 )
 
+# Le constants
+# Mr_SuMtHuN 2025
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 VERSION = "1.0.4-beta"
 APP_NAME = "ARCS"
 APP_TITLE = "ARCS Quote Manager"
 
 UI_BG = "#0b1220"
-TOOLBAR_BG = "#B22234"
+TOOLBAR_BG = "#590101"
 PANEL_BG = "#000000"
 ALT_PANEL_BG = "#12233a"
 FG = "#ffffff"
-ACCENT = "#B22234"
+ACCENT = "#590101"
 ACCENT2 = "#ffffff"
 ACCENT3 = "#ffffff"
 
@@ -161,22 +161,22 @@ class LoadQuoteDialog(QtWidgets.QDialog):
 
         btn_layout = QtWidgets.QHBoxLayout()
         self.load_btn = QtWidgets.QPushButton("Load")
-        self.del_btn = QtWidgets.QPushButton("Delete")
-        self.exp_btn = QtWidgets.QPushButton("Export")
-        self.imp_btn = QtWidgets.QPushButton("Import")
+        self.delete_button = QtWidgets.QPushButton("Delete")
+        self.export_button = QtWidgets.QPushButton("Export")
+        self.import_button = QtWidgets.QPushButton("Import")
         btn_layout.addWidget(self.load_btn)
-        btn_layout.addWidget(self.del_btn)
-        btn_layout.addWidget(self.exp_btn)
-        btn_layout.addWidget(self.imp_btn)
+        btn_layout.addWidget(self.delete_button)
+        btn_layout.addWidget(self.export_button)
+        btn_layout.addWidget(self.import_button)
         btn_layout.addStretch()
         self.close_btn = QtWidgets.QPushButton("Close")
         btn_layout.addWidget(self.close_btn)
         layout.addLayout(btn_layout)
 
         self.load_btn.clicked.connect(self._load)
-        self.del_btn.clicked.connect(self._delete)
-        self.exp_btn.clicked.connect(self._export)
-        self.imp_btn.clicked.connect(self._import)
+        self.delete_button.clicked.connect(self._delete)
+        self.export_button.clicked.connect(self._export)
+        self.import_button.clicked.connect(self._import)
         self.close_btn.clicked.connect(self.close)
 
     def _load(self):
@@ -289,7 +289,6 @@ class ArcsWindow(QtWidgets.QMainWindow):
             if pix is not None and not pix.isNull():
                 self.setWindowIcon(QtGui.QIcon(pix))
             else:
-                # fallback: try QIcon directly (may work for some formats)
                 if APP_ICON and os.path.exists(APP_ICON):
                     qicon = QtGui.QIcon(APP_ICON)
                     if not qicon.isNull():
@@ -305,16 +304,14 @@ class ArcsWindow(QtWidgets.QMainWindow):
         self.addToolBar(self.toolbar)
         self.toolbar.setMovable(False)
         self.toolbar.setStyleSheet("QToolBar { padding: 4px 6px; }")
-        # If pixmap was loaded above, add a small brand icon to the left of the toolbar
+
         try:
             if hasattr(self, "windowIcon") and not self.windowIcon().isNull():
-                # Create a small pixmap for the toolbar
                 pix = self.windowIcon().pixmap(18, 18)
                 if pix and not pix.isNull():
                     brand_lbl = QtWidgets.QLabel()
                     brand_lbl.setPixmap(pix)
                     brand_lbl.setContentsMargins(6, 8, 8, 6)
-                    # Insert brand label at beginning of toolbar
                     first_action = (
                         self.toolbar.actions()[0] if self.toolbar.actions() else None
                     )
@@ -335,6 +332,19 @@ class ArcsWindow(QtWidgets.QMainWindow):
         self.btn_pdf = QtGui.QAction("Export PDF", self)
         self.btn_exit = QtGui.QAction("Exit", self)
 
+        # We hate tooltips, this removes them. AS THEY SHOULD BE.
+        for act in [
+            self.btn_new,
+            self.btn_add,
+            self.btn_edit,
+            self.btn_del,
+            self.btn_save,
+            self.btn_load,
+            self.btn_pdf,
+            self.btn_exit,
+        ]:
+            act.setToolTip("")
+            act.setStatusTip("")
         for act in [
             self.btn_new,
             self.btn_add,
@@ -633,7 +643,7 @@ class ArcsWindow(QtWidgets.QMainWindow):
                 ]
             )
         )
-        h = table.wrapOn(c, available_width, y)
+        w, h = table.wrapOn(c, available_width, y)
         if h > (y - 72):
             c.showPage()
             y = 750
