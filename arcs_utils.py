@@ -1,3 +1,5 @@
+# arcs_utils.py
+# Handler utilities for ARCS application data
 from __future__ import annotations
 
 import json
