@@ -2,7 +2,7 @@
 
 [![Python](https://img.shields.io/badge/Python-3.8%2B-blue)](https://www.python.org/) [![Platform](https://img.shields.io/badge/Platform-macOS%20%7C%20Windows-brightgreen)]() [![Version](https://img.shields.io/badge/Version-1.0.4-purple)]() [![Status](https://img.shields.io/badge/Status-Beta-yellow)]() [![Qt](https://img.shields.io/badge/Qt-2CDE85?logo=Qt&logoColor=fff)](#)
 
-Lightweight RFQ/quoting app built with Tkinter. Add parts, set PO#, save/load quotes as JSON, and export printable PDFs.
+Lightweight RFQ/quoting app built with PyQt6. Add parts, set PO#, save/load quotes as JSON, and export printable PDFs.
 
 Quick start
 
