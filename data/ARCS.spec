@@ -31,10 +31,22 @@ a = Analysis(
         'PyQt6.QtCore',
         'PyQt6.QtGui',
         'PyQt6.QtWidgets',
+        'PyQt6.sip',
         'PIL',
         'PIL.Image',
         'reportlab',
         'reportlab.pdfgen',
+        'reportlab.pdfgen.canvas',
+        'reportlab.lib',
+        'reportlab.lib.pagesizes',
+        'reportlab.lib.colors',
+        'reportlab.lib.units',
+        'reportlab.platypus',
+        'reportlab.platypus.tables',
+        'reportlab.pdfbase',
+        'reportlab.pdfbase.pdfmetrics',
+        'reportlab.pdfbase.ttfonts',
+        'reportlab.rl_config',
     ],
     hookspath=[],
     hooksconfig={},
@@ -48,9 +60,6 @@ pyz = PYZ(a.pure, a.zipped_data)
 exe = EXE(
     pyz,
     a.scripts,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
     name='ARCS',
     debug=False,
     bootloader_ignore_signals=False,
@@ -66,8 +75,19 @@ exe = EXE(
     entitlements_file=None,
     icon=[os.path.join(here, 'app.icns')],
 )
-app = BUNDLE(
+
+coll = COLLECT(
     exe,
+    a.binaries,
+    a.zipfiles,
+    a.datas,
+    strip=False,
+    upx=True,
+    name='ARCS',
+)
+
+app = BUNDLE(
+    coll,
     name='ARCS.app',
     icon=os.path.join(here, 'app.icns'),
     bundle_identifier=None,
