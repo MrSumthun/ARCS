@@ -15,9 +15,16 @@ project_root = os.path.abspath(os.path.join(here, '..'))
 script_path = os.path.join(project_root, 'arcs.py')
 
 # Include the data directory (bundle as 'data') and the icons next to the spec
+from PyInstaller.utils.hooks import collect_submodules, collect_data_files
+
+# Collect reportlab modules and data so fonts and configs are included in the bundle
+reportlab_subs = collect_submodules('reportlab')
+reportlab_datas = collect_data_files('reportlab')
+
+# merge datas
 datas = [
     (here, 'data'),
-]
+] + reportlab_datas
 
 # On Windows, ensure the Python runtime DLL(s) are explicitly bundled so the
 # launcher can load them at runtime (avoids "Failed to load Python DLL" errors).
@@ -66,6 +73,12 @@ a = Analysis(
     noarchive=False,
     optimize=0,
 )
+# Ensure collected reportlab submodules are included in the analysis
+try:
+    a.hiddenimports.extend(reportlab_subs)
+except NameError:
+    pass
+
 pyz = PYZ(a.pure, a.zipped_data)
 
 exe = EXE(
