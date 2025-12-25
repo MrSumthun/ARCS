@@ -19,10 +19,21 @@ datas = [
     (here, 'data'),
 ]
 
+# On Windows, ensure the Python runtime DLL(s) are explicitly bundled so the
+# launcher can load them at runtime (avoids "Failed to load Python DLL" errors).
+import sys, glob
+binaries = []
+if sys.platform == 'win32':
+    base_prefix = getattr(sys, 'base_prefix', sys.prefix)
+    # Collect python*.dll in the base prefix (covers python314.dll, python3.dll, etc.)
+    for path in glob.glob(os.path.join(base_prefix, 'python*.dll')):
+        binaries.append((path, '.'))
+
+
 a = Analysis(
     [script_path],
     pathex=[project_root],
-    binaries=[],
+    binaries=binaries,
     datas=datas,
     # Ensure PyQt6, Pillow and reportlab modules are discovered by PyInstaller
     hiddenimports=[
