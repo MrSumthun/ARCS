@@ -11,7 +11,7 @@ set NAME=ARCS
 
 echo Building %NAME% (using spec at data\ARCS.spec) ...
 pushd ..
-pyinstaller --onedir --noupx data\ARCS.spec
+pyinstaller data\ARCS.spec
 if errorlevel 1 (
   echo Build failed
   popd
