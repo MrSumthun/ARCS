@@ -33,18 +33,19 @@ if %USE_TEMP%==1 (
   set DISTPATH=
 )
 
-REM Build: use the .spec when caller passes --spec; otherwise build with onedir/noupx on the script
-if "%1"=="--spec" (
-  if "%USE_TEMP%"=="1" (
-    pyinstaller --workpath "%WORKPATH%" --distpath "%DISTPATH%" data\ARCS.spec
-  ) else (
-    pyinstaller data\ARCS.spec
-  )
-) else (
+REM Default: use the .spec file for builds (ensures data/ARCS.spec is used and ReportLab is collected)
+REM Pass --script to build using arcs.py instead (script-based build uses --onedir --noupx)
+if "%1"=="--script" (
   if "%USE_TEMP%"=="1" (
     pyinstaller --onedir --noupx --workpath "%WORKPATH%" --distpath "%DISTPATH%" arcs.py
   ) else (
     pyinstaller --onedir --noupx arcs.py
+  )
+) else (
+  if "%USE_TEMP%"=="1" (
+    pyinstaller --workpath "%WORKPATH%" --distpath "%DISTPATH%" data\ARCS.spec
+  ) else (
+    pyinstaller data\ARCS.spec
   )
 )
 if errorlevel 1 (
@@ -102,5 +103,6 @@ if "%USE_TEMP%"=="1" (
 
 goto :eof
 :help
-echo Usage: windowsBuild.bat [--help]
-echo Builds a Windows one-file app using PyInstaller. Run on Windows.
+echo Usage: windowsBuild.bat [--help] [--script]
+echo Builds using data\ARCS.spec by default (includes ReportLab and other collected data).
+echo Use --script to build directly from arcs.py with --onedir --noupx.
