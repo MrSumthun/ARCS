@@ -113,12 +113,9 @@ class AddEditPartDialog(QtWidgets.QDialog):
         self.list_spin.setDecimals(2)
         self.margin_label = QtWidgets.QLabel("N/A")
         self.source_edit = QtWidgets.QLineEdit()
-        # Per-supplier tax exempt checkbox
         self.tax_exempt_cb = QtWidgets.QCheckBox("Tax Exempt (Supplier)")
         self.tax_exempt_cb.setChecked(False)
-        # Track whether this dialog is editing an existing item or adding a new one
         self._editing_item = bool(item)
-        # If user changes source while adding a new item, update tax checkbox from supplier mapping
         self.source_edit.textChanged.connect(self._source_changed)
 
         layout.addRow("Part #", self.part_edit)
@@ -148,9 +145,7 @@ class AddEditPartDialog(QtWidgets.QDialog):
             self.unit_spin.setValue(float(item.get("unit_cost", 0.0)))
             self.list_spin.setValue(float(item.get("list_price", 0.0)))
             self.source_edit.setText(item.get("source", ""))
-            # restore tax exempt status if present on the item
             self.tax_exempt_cb.setChecked(bool(item.get("tax_exempt", False)))
-            # Update margin display to reflect loaded values
             self.update_margin()
 
     def _source_changed(self, txt: str):
@@ -185,11 +180,6 @@ class AddEditPartDialog(QtWidgets.QDialog):
         }
 
     def update_margin(self):
-        """Update the margin label based on unit cost and list price.
-
-        Margin is calculated as ((list - cost) / list) * 100. If list price is 0,
-        the margin is shown as 'N/A' to avoid division by zero.
-        """
         try:
             cost = float(self.unit_spin.value())
             lst = float(self.list_spin.value())
