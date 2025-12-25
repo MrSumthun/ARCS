@@ -111,6 +111,7 @@ class AddEditPartDialog(QtWidgets.QDialog):
         self.list_spin = QtWidgets.QDoubleSpinBox()
         self.list_spin.setMaximum(10_000_000.0)
         self.list_spin.setDecimals(2)
+        self.margin_label = QtWidgets.QLabel("N/A")
         self.source_edit = QtWidgets.QLineEdit()
 
         layout.addRow("Part #", self.part_edit)
@@ -118,6 +119,7 @@ class AddEditPartDialog(QtWidgets.QDialog):
         layout.addRow("Qty", self.qty_spin)
         layout.addRow("Unit Cost", self.unit_spin)
         layout.addRow("List Price", self.list_spin)
+        layout.addRow("Margin %", self.margin_label)
         layout.addRow("Source", self.source_edit)
 
         btn_box = QtWidgets.QDialogButtonBox(
@@ -128,6 +130,9 @@ class AddEditPartDialog(QtWidgets.QDialog):
         btn_box.rejected.connect(self.reject)
         layout.addRow(btn_box)
 
+        self.unit_spin.valueChanged.connect(self.update_margin)
+        self.list_spin.valueChanged.connect(self.update_margin)
+
         if item:
             self.part_edit.setText(item.get("part_number", ""))
             self.desc_edit.setText(item.get("description", ""))
@@ -135,6 +140,8 @@ class AddEditPartDialog(QtWidgets.QDialog):
             self.unit_spin.setValue(float(item.get("unit_cost", 0.0)))
             self.list_spin.setValue(float(item.get("list_price", 0.0)))
             self.source_edit.setText(item.get("source", ""))
+            # Update margin display to reflect loaded values
+            self.update_margin()
 
     def get_data(self):
         return {
@@ -148,6 +155,26 @@ class AddEditPartDialog(QtWidgets.QDialog):
                 int(self.qty_spin.value()) * float(self.unit_spin.value()), 2
             ),
         }
+
+    def update_margin(self):
+        """Update the margin label based on unit cost and list price.
+
+        Margin is calculated as ((list - cost) / list) * 100. If list price is 0,
+        the margin is shown as 'N/A' to avoid division by zero.
+        """
+        try:
+            cost = float(self.unit_spin.value())
+            lst = float(self.list_spin.value())
+            if lst == 0.0:
+                if cost == 0.0:
+                    self.margin_label.setText("0.00%")
+                else:
+                    self.margin_label.setText("N/A")
+                return
+            margin = ((lst - cost) / lst) * 100.0
+            self.margin_label.setText(f"{margin:.2f}%")
+        except Exception:
+            self.margin_label.setText("N/A")
 
 
 class LoadQuoteDialog(QtWidgets.QDialog):
