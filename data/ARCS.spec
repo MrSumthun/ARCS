@@ -64,8 +64,8 @@ exe = EXE(
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,
-    upx_exclude=[],
+    upx=False,
+    upx_exclude=['python314.dll','python3.dll','python3.14.dll'],
     runtime_tmpdir=None,
     console=False,
     disable_windowed_traceback=False,
@@ -82,7 +82,8 @@ coll = COLLECT(
     a.zipfiles,
     a.datas,
     strip=False,
-    upx=True,
+    upx=False,
+    upx_exclude=['python314.dll','python3.dll','python3.14.dll'],
     name='ARCS',
 )
 
