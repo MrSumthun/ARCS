@@ -113,6 +113,13 @@ class AddEditPartDialog(QtWidgets.QDialog):
         self.list_spin.setDecimals(2)
         self.margin_label = QtWidgets.QLabel("N/A")
         self.source_edit = QtWidgets.QLineEdit()
+        # Per-supplier tax exempt checkbox
+        self.tax_exempt_cb = QtWidgets.QCheckBox("Tax Exempt (Supplier)")
+        self.tax_exempt_cb.setChecked(False)
+        # Track whether this dialog is editing an existing item or adding a new one
+        self._editing_item = bool(item)
+        # If user changes source while adding a new item, update tax checkbox from supplier mapping
+        self.source_edit.textChanged.connect(self._source_changed)
 
         layout.addRow("Part #", self.part_edit)
         layout.addRow("Description", self.desc_edit)
@@ -121,6 +128,7 @@ class AddEditPartDialog(QtWidgets.QDialog):
         layout.addRow("List Price", self.list_spin)
         layout.addRow("Margin %", self.margin_label)
         layout.addRow("Source", self.source_edit)
+        layout.addRow("Tax Exempt", self.tax_exempt_cb)
 
         btn_box = QtWidgets.QDialogButtonBox(
             QtWidgets.QDialogButtonBox.StandardButton.Ok
@@ -140,8 +148,27 @@ class AddEditPartDialog(QtWidgets.QDialog):
             self.unit_spin.setValue(float(item.get("unit_cost", 0.0)))
             self.list_spin.setValue(float(item.get("list_price", 0.0)))
             self.source_edit.setText(item.get("source", ""))
+            # restore tax exempt status if present on the item
+            self.tax_exempt_cb.setChecked(bool(item.get("tax_exempt", False)))
             # Update margin display to reflect loaded values
             self.update_margin()
+
+    def _source_changed(self, txt: str):
+        if self._editing_item:
+            return
+        try:
+            parent = self.parent()
+            if not parent:
+                return
+            q = getattr(parent, "current", {}).get("quote") if getattr(parent, "current", None) else None
+            if not q:
+                return
+            suppliers = q.get("suppliers", {})
+            s = txt.strip() or "<unknown>"
+            if s in suppliers:
+                self.tax_exempt_cb.setChecked(bool(suppliers.get(s, {}).get("tax_exempt", False)))
+        except Exception:
+            pass
 
     def get_data(self):
         return {
@@ -151,6 +178,7 @@ class AddEditPartDialog(QtWidgets.QDialog):
             "unit_cost": float(self.unit_spin.value()),
             "list_price": float(self.list_spin.value()),
             "source": self.source_edit.text().strip(),
+            "tax_exempt": bool(self.tax_exempt_cb.isChecked()),
             "line_total": round(
                 int(self.qty_spin.value()) * float(self.unit_spin.value()), 2
             ),
@@ -312,6 +340,37 @@ class LoadQuoteDialog(QtWidgets.QDialog):
         )
 
 
+class SuppliersDialog(QtWidgets.QDialog):
+    """Dialog for managing supplier-level settings (e.g., tax exempt)."""
+
+    def __init__(self, parent=None, suppliers=None, existing=None):
+        super().__init__(parent)
+        self.setWindowTitle("Manage Suppliers")
+        self.setModal(True)
+        self.suppliers = suppliers or []
+        self.existing = existing or {}
+        layout = QtWidgets.QVBoxLayout(self)
+        form = QtWidgets.QFormLayout()
+        self._checks: dict[str, QtWidgets.QCheckBox] = {}
+        for s in sorted(self.suppliers):
+            cb = QtWidgets.QCheckBox("Tax Exempt")
+            cb.setChecked(bool(self.existing.get(s, {}).get("tax_exempt", False)))
+            form.addRow(s, cb)
+            self._checks[s] = cb
+        layout.addLayout(form)
+        btn_box = QtWidgets.QDialogButtonBox(
+            QtWidgets.QDialogButtonBox.StandardButton.Ok
+            | QtWidgets.QDialogButtonBox.StandardButton.Cancel
+        )
+        btn_box.accepted.connect(self.accept)
+        btn_box.rejected.connect(self.reject)
+        layout.addWidget(btn_box)
+
+    def get_mapping(self):
+        """Return a mapping of supplier->tax_exempt bool."""
+        return {s: bool(cb.isChecked()) for s, cb in self._checks.items()}
+
+
 class ArcsWindow(QtWidgets.QMainWindow):
     def __init__(self):
         super().__init__()
@@ -365,6 +424,7 @@ class ArcsWindow(QtWidgets.QMainWindow):
         self.btn_del = QtGui.QAction("Delete Item", self)
         self.btn_save = QtGui.QAction("Save Quote", self)
         self.btn_load = QtGui.QAction("Load Quote", self)
+        self.btn_suppliers = QtGui.QAction("Suppliers", self)
         self.btn_pdf = QtGui.QAction("Export PDF", self)
         self.btn_exit = QtGui.QAction("Exit", self)
 
@@ -376,6 +436,7 @@ class ArcsWindow(QtWidgets.QMainWindow):
             self.btn_del,
             self.btn_save,
             self.btn_load,
+            self.btn_suppliers,
             self.btn_pdf,
             self.btn_exit,
         ]:
@@ -388,8 +449,11 @@ class ArcsWindow(QtWidgets.QMainWindow):
             self.btn_del,
             self.btn_save,
             self.btn_load,
+            self.btn_suppliers,
         ]:
             self.toolbar.addAction(act)
+        # Connect suppliers handler
+        self.btn_suppliers.triggered.connect(self.manage_suppliers)
 
         self.toolbar.addSeparator()
         ver_lbl = QtWidgets.QLabel(VERSION)
@@ -501,6 +565,32 @@ class ArcsWindow(QtWidgets.QMainWindow):
             self.update_table()
             self.update_totals()
 
+    def manage_suppliers(self):
+        q = self.current.get("quote")
+        if not q:
+            QtWidgets.QMessageBox.information(self, "Suppliers", "No current quote.")
+            return
+        # Aggregate supplier names from items
+        suppliers = sorted({(it.get("source") or "<unknown>").strip() for it in q.get("items", [])})
+        existing = q.get("suppliers", {}) or {}
+        dlg = SuppliersDialog(self, suppliers=suppliers, existing=existing)
+        if dlg.exec() == QtWidgets.QDialog.DialogCode.Accepted:
+            mapping = dlg.get_mapping()
+            # Save supplier-level mapping to quote
+            q["suppliers"] = {s: {"tax_exempt": bool(v)} for s, v in mapping.items()}
+            # Propagate supplier tax flags to items
+            for it in q.get("items", []):
+                src = (it.get("source") or "").strip()
+                if not src:
+                    src = "<unknown>"
+                it["tax_exempt"] = bool(mapping.get(src, False))
+            self.update_table()
+            # Optionally auto-save silently to persist supplier choices
+            try:
+                self.save_current(silent=True)
+            except Exception:
+                pass
+
     def update_table(self):
         q = self.current.get("quote")
         self.table.setRowCount(0)
@@ -527,8 +617,11 @@ class ArcsWindow(QtWidgets.QMainWindow):
                 4,
                 QtWidgets.QTableWidgetItem(f"{(it.get('list_price') or 0.0):.2f}"),
             )
+            src_val = it.get("source") or ""
+            if it.get("tax_exempt"):
+                src_val = f"{src_val} (Tax Exempt)"
             self.table.setItem(
-                idx, 5, QtWidgets.QTableWidgetItem(it.get("source") or "")
+                idx, 5, QtWidgets.QTableWidgetItem(src_val)
             )
             self.table.setItem(
                 idx,
