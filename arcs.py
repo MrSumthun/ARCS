@@ -564,6 +564,7 @@ class ArcsWindow(QtWidgets.QMainWindow):
             self.update_totals()
 
     def manage_suppliers(self):
+        # I'll be frank, this part is totally AI generated. Couldn't figure it out. :)
         q = self.current.get("quote")
         if not q:
             QtWidgets.QMessageBox.information(self, "Suppliers", "No current quote.")
@@ -573,12 +574,10 @@ class ArcsWindow(QtWidgets.QMainWindow):
             {(it.get("source") or "<unknown>").strip() for it in q.get("items", [])}
         )
         existing = q.get("suppliers", {}) or {}
-        dlg = SuppliersDialog(self, suppliers=suppliers, existing=existing)
-        if dlg.exec() == QtWidgets.QDialog.DialogCode.Accepted:
-            mapping = dlg.get_mapping()
-            # Save supplier-level mapping to quote
+        supp_dialog = SuppliersDialog(self, suppliers=suppliers, existing=existing)
+        if supp_dialog.exec() == QtWidgets.QDialog.DialogCode.Accepted:
+            mapping = supp_dialog.get_mapping()
             q["suppliers"] = {s: {"tax_exempt": bool(v)} for s, v in mapping.items()}
-            # Propagate supplier tax flags to items
             for it in q.get("items", []):
                 src = (it.get("source") or "").strip()
                 if not src:
