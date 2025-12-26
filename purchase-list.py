@@ -37,10 +37,8 @@ def find_quotes_file(preferred: str | None = None) -> str | None:
 
 
 def print_table(rows):
-    # simple column widths (includes Tax Exempt flag)
     cols = ["Part", "Qty", "Source", "Unit Cost", "List Price", "Tax Exempt"]
     widths = [max(len(c), 12) for c in cols]
-    # compute widths from rows
     for r in rows:
         widths[0] = max(widths[0], len(str(r["part_number"])))
         widths[1] = max(widths[1], len(str(r["quantity"])))
@@ -75,11 +73,12 @@ def print_per_quote(quotes: List[Dict[str, Any]]):
             print(f"\n{name}: (no items)")
             continue
 
-        # Compute supplier tax-exempt status from item flags
         supplier_exempt: Dict[str, bool] = {}
         for it in items:
             src = (it.get("source") or "<unknown>").strip()
-            supplier_exempt[src] = supplier_exempt.get(src, False) or bool(it.get("tax_exempt", False))
+            supplier_exempt[src] = supplier_exempt.get(src, False) or bool(
+                it.get("tax_exempt", False)
+            )
 
         agg: Dict[tuple, Dict[str, Any]] = {}
         for it in items:
@@ -105,7 +104,9 @@ def print_per_quote(quotes: List[Dict[str, Any]]):
                     entry["unit_cost"] = unit
                 if listp < entry.get("list_price", listp):
                     entry["list_price"] = listp
-                entry["tax_exempt"] = entry.get("tax_exempt", False) or bool(it.get("tax_exempt", False))
+                entry["tax_exempt"] = entry.get("tax_exempt", False) or bool(
+                    it.get("tax_exempt", False)
+                )
         rows = sorted(agg.values(), key=lambda x: (x["part_number"], x["source"]))
         po = q.get("po_number")
         print("\n" + "=" * 60)
@@ -114,13 +115,11 @@ def print_per_quote(quotes: List[Dict[str, Any]]):
         else:
             print(f"{name}")
         print("-" * 60)
-        # Print suppliers and their tax status
         if supplier_exempt:
             print("Suppliers:")
             for s in sorted(supplier_exempt.keys()):
                 status = " (Tax Exempt)" if supplier_exempt.get(s) else ""
                 print(f"  {s}{status}")
-            # Print a concise list of tax-exempt suppliers if any
             exempt_suppliers = sorted([s for s, v in supplier_exempt.items() if v])
             if exempt_suppliers:
                 print("Tax-exempt suppliers: " + ", ".join(exempt_suppliers))
@@ -174,7 +173,9 @@ def main(argv=None):
                         entry["unit_cost"] = unit
                     if listp < entry.get("list_price", listp):
                         entry["list_price"] = listp
-                    entry["tax_exempt"] = entry.get("tax_exempt", False) or bool(it.get("tax_exempt", False))
+                    entry["tax_exempt"] = entry.get("tax_exempt", False) or bool(
+                        it.get("tax_exempt", False)
+                    )
             per.append(
                 {
                     "quote": q.get("name") or f"Quote {i}",

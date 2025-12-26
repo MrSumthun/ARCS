@@ -155,13 +155,19 @@ class AddEditPartDialog(QtWidgets.QDialog):
             parent = self.parent()
             if not parent:
                 return
-            q = getattr(parent, "current", {}).get("quote") if getattr(parent, "current", None) else None
+            q = (
+                getattr(parent, "current", {}).get("quote")
+                if getattr(parent, "current", None)
+                else None
+            )
             if not q:
                 return
             suppliers = q.get("suppliers", {})
             s = txt.strip() or "<unknown>"
             if s in suppliers:
-                self.tax_exempt_cb.setChecked(bool(suppliers.get(s, {}).get("tax_exempt", False)))
+                self.tax_exempt_cb.setChecked(
+                    bool(suppliers.get(s, {}).get("tax_exempt", False))
+                )
         except Exception:
             pass
 
@@ -561,7 +567,9 @@ class ArcsWindow(QtWidgets.QMainWindow):
             QtWidgets.QMessageBox.information(self, "Suppliers", "No current quote.")
             return
         # Aggregate supplier names from items
-        suppliers = sorted({(it.get("source") or "<unknown>").strip() for it in q.get("items", [])})
+        suppliers = sorted(
+            {(it.get("source") or "<unknown>").strip() for it in q.get("items", [])}
+        )
         existing = q.get("suppliers", {}) or {}
         dlg = SuppliersDialog(self, suppliers=suppliers, existing=existing)
         if dlg.exec() == QtWidgets.QDialog.DialogCode.Accepted:
@@ -610,9 +618,7 @@ class ArcsWindow(QtWidgets.QMainWindow):
             src_val = it.get("source") or ""
             if it.get("tax_exempt"):
                 src_val = f"{src_val} (Tax Exempt)"
-            self.table.setItem(
-                idx, 5, QtWidgets.QTableWidgetItem(src_val)
-            )
+            self.table.setItem(idx, 5, QtWidgets.QTableWidgetItem(src_val))
             self.table.setItem(
                 idx,
                 6,
@@ -823,7 +829,9 @@ def main():
             try:
                 app.setWindowIcon(QtGui.QIcon(APP_ICNS))
             except Exception:
-                logger.debug("Failed to set application icon on QApplication", exc_info=True)
+                logger.debug(
+                    "Failed to set application icon on QApplication", exc_info=True
+                )
     except Exception:
         logger.debug("Failed to determine platform for app icon", exc_info=True)
 
