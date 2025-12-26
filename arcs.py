@@ -25,9 +25,11 @@ from arcs_utils import (
 # Le constants
 # Mr_SuMtHuN 2025
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
-VERSION = "v1.0.6-beta"
+VERSION = "v1.0.6-Beta"
 APP_NAME = "ARCS"
 APP_TITLE = "ARCS Quote Manager"
+MAIN_WINDOW_X = 1400
+MAIN_WINDOW_Y = 780
 
 UI_BG = "#0b1220"
 TOOLBAR_BG = "#590101"
@@ -224,9 +226,9 @@ class LoadQuoteDialog(QtWidgets.QDialog):
         self.delete_button = QtWidgets.QPushButton("Delete")
         self.export_button = QtWidgets.QPushButton("Export")
         self.import_button = QtWidgets.QPushButton("Import")
+        btn_layout.addWidget(self.export_button)
         btn_layout.addWidget(self.load_btn)
         btn_layout.addWidget(self.delete_button)
-        btn_layout.addWidget(self.export_button)
         btn_layout.addWidget(self.import_button)
         btn_layout.addStretch()
         self.close_btn = QtWidgets.QPushButton("Close")
@@ -371,7 +373,7 @@ class ArcsWindow(QtWidgets.QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle(APP_TITLE)
-        self.resize(1000, 700)
+        self.resize(MAIN_WINDOW_X, MAIN_WINDOW_Y)
 
         try:
             pix = (
