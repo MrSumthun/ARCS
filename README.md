@@ -25,7 +25,7 @@ Core features
 
 - Add/edit/delete parts (part #, description, qty, unit cost, list price, source)
 - Save/load quotes to `data/quotes.json` (user data stored in `~/.arcsoftware/quotes.json` when packaged)
-- Export/import single quotes (JSON) and export printable PDF (ReportLab or HTML fallback)
+- Export/import single quotes (JSON) and export printable PDF (ReportLab)
 - PO# toolbar, notes area, and totals
 
 Developer notes
