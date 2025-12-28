@@ -1,6 +1,5 @@
 import json
 import os
-import tempfile
 import datetime
 import webbrowser
 import logging
@@ -25,7 +24,7 @@ from arcs_utils import (
 # Le constants
 # Mr_SuMtHuN 2025
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
-VERSION = "v1.0.6-Beta"
+VERSION = "v1.1.0-Beta"
 APP_NAME = "ARCS"
 APP_TITLE = "ARCS Quote Manager"
 MAIN_WINDOW_X = 1400
@@ -701,22 +700,20 @@ class ArcsWindow(QtWidgets.QMainWindow):
             if q:
                 self.set_current_quote(q)
 
-    def export_pdf(self):
-        q = self.current.get("quote")
-        if not q:
-            QtWidgets.QMessageBox.information(
-                self, "Export", "No current quote to export."
-            )
-            return
-        fd, path = tempfile.mkstemp(suffix=".pdf")
-        os.close(fd)
+    def _generate_pdf(self, path: str, q: dict, price_mode: str = "unit"):
+        """Generate a PDF for quote `q` at `path`.
+
+        price_mode: 'unit' = use unit_cost; 'list' = use list_price
+        """
         c = canvas.Canvas(path, pagesize=letter)
         y = 750
         c.setFont("Helvetica-Bold", 16)
         c.drawString(72, y, APP_NAME)
         y -= 25
         c.setFont("Helvetica-Bold", 14)
-        c.drawString(72, y, q.get("name"))
+        title = q.get("name")
+        subtitle = "Purchasing - Internal" if price_mode == "unit" else "Customer Copy"
+        c.drawString(72, y, f"{title} ({subtitle})")
         y -= 30
         left = 72
         right = 72
@@ -736,18 +733,25 @@ class ArcsWindow(QtWidgets.QMainWindow):
             0.9 * inch,
         ]
         data = [["No", "Part", "Description", "Qty", "Unit", "Line"]]
+        total = 0.0
         for idx, it in enumerate(q.get("items", []), start=1):
+            qty = int(it.get("quantity") or 0)
+            if price_mode == "unit":
+                unit = float(it.get("unit_cost") or 0.0)
+            else:
+                unit = float(it.get("list_price") or 0.0)
+            line = round(qty * unit, 2)
+            total += line
             data.append(
                 [
                     str(idx),
                     it.get("part_number") or "",
                     it.get("description") or "",
-                    str(it.get("quantity") or ""),
-                    f"${(it.get('unit_cost') or 0.0):.2f}",
-                    f"${(it.get('line_total') or 0.0):.2f}",
+                    str(qty),
+                    f"${unit:.2f}",
+                    f"${line:.2f}",
                 ]
             )
-        total = sum(it.get("line_total", 0.0) for it in q.get("items", []))
         data.append(["", "", "", "", "Total", f"${total:.2f}"])
         table = Table(data, colWidths=col_widths)
         table.repeatRows = 1
@@ -773,7 +777,7 @@ class ArcsWindow(QtWidgets.QMainWindow):
             c.drawString(left, y, APP_NAME)
             y -= 25
             c.setFont("Helvetica-Bold", 14)
-            c.drawString(left, y, q.get("name"))
+            c.drawString(left, y, f"{title} ({subtitle})")
             y -= 30
             po = q.get("po_number")
             if po:
@@ -784,7 +788,84 @@ class ArcsWindow(QtWidgets.QMainWindow):
         table.drawOn(c, left, y - h)
         y = y - h - 12
         c.save()
-        webbrowser.open("file://" + path)
+
+    def export_pdf(self):
+        q = self.current.get("quote")
+        if not q:
+            QtWidgets.QMessageBox.information(
+                self, "Export", "No current quote to export."
+            )
+            return
+
+        choices = [
+            "Purchasing (Unit Cost)",
+            "Customer (List Price)",
+            "Both (Purchasing + Customer)",
+        ]
+        choice, ok = QtWidgets.QInputDialog.getItem(
+            self, "Export PDF", "Export Type:", choices, 0, False
+        )
+        if not ok:
+            return
+
+        base = safe_filename(normalize_quote_name(q))
+
+        try:
+            if choice.startswith("Purchasing"):
+                suggested = f"{base}_purchasing.pdf"
+                fn, _ = QtWidgets.QFileDialog.getSaveFileName(
+                    self,
+                    "Export Purchase PDF",
+                    suggested,
+                    "PDF Files (*.pdf);;All Files (*)",
+                )
+                if not fn:
+                    return
+                self._generate_pdf(fn, q, "unit")
+                QtWidgets.QMessageBox.information(
+                    self, "Export", f"Quote exported to {fn}"
+                )
+                webbrowser.open("file://" + fn)
+
+            elif choice.startswith("Customer"):
+                suggested = f"{base}_customer.pdf"
+                fn, _ = QtWidgets.QFileDialog.getSaveFileName(
+                    self,
+                    "Export Customer PDF",
+                    suggested,
+                    "PDF Files (*.pdf);;All Files (*)",
+                )
+                if not fn:
+                    return
+                self._generate_pdf(fn, q, "list")
+                QtWidgets.QMessageBox.information(
+                    self, "Export", f"Quote exported to {fn}"
+                )
+                webbrowser.open("file://" + fn)
+
+            else:  # Both
+                fn, _ = QtWidgets.QFileDialog.getSaveFileName(
+                    self,
+                    "Export PDFs",
+                    f"{base}.pdf",
+                    "PDF Files (*.pdf);;All Files (*)",
+                )
+                if not fn:
+                    return
+                directory = os.path.dirname(fn)
+                name = os.path.splitext(os.path.basename(fn))[0]
+                p1 = os.path.join(directory, f"{name}_purchasing.pdf")
+                p2 = os.path.join(directory, f"{name}_customer.pdf")
+                self._generate_pdf(p1, q, "unit")
+                self._generate_pdf(p2, q, "list")
+                QtWidgets.QMessageBox.information(
+                    self, "Export", f"Generated {p1} and {p2}"
+                )
+                webbrowser.open("file://" + p1)
+                webbrowser.open("file://" + p2)
+
+        except Exception as e:
+            QtWidgets.QMessageBox.critical(self, "Export", f"Failed to export: {e}")
 
     def closeEvent(self, event: QtGui.QCloseEvent) -> None:
         q = self.current.get("quote")
