@@ -338,8 +338,7 @@ class LoadQuoteDialog(QtWidgets.QDialog):
 
 
 class SuppliersDialog(QtWidgets.QDialog):
-    """Dialog for managing supplier-level settings (e.g., tax exempt)."""
-
+    
     def __init__(self, parent=None, suppliers=None, existing=None):
         super().__init__(parent)
         self.setWindowTitle("Manage Suppliers")
