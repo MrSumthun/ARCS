@@ -24,9 +24,9 @@ from arcs_utils import (
 # Le constants
 # Mr_SuMtHuN 2025
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
-VERSION = "v1.1.0-Beta"
+VERSION = "v1.1.0"
 APP_NAME = "ARCS"
-APP_TITLE = "ARCS Quote Manager"
+APP_TITLE = "ARCS"
 MAIN_WINDOW_X = 1400
 MAIN_WINDOW_Y = 780
 
